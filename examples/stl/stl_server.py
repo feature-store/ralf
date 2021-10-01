@@ -4,10 +4,9 @@ import argparse
 from typing import List
 import time
 import numpy as np
-import pickle
 from collections import defaultdict
 
-from typing import Optional, List, Type
+from typing import List, Optional
 import ray
 
 from statsmodels.tsa.seasonal import STL, DecomposeResult
@@ -16,7 +15,6 @@ import pandas as pd
 
 import psutil
 
-import sys
 from kafka import KafkaConsumer
 import msgpack
 import redis
@@ -24,7 +22,6 @@ import redis
 from ralf.operator import Operator, DEFAULT_STATE_CACHE_SIZE
 from ralf.operators import (
     Source,
-    TumblingWindow,
     LeftJoin,
 )
 from ralf.state import Record, Schema

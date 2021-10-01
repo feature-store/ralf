@@ -5,28 +5,19 @@ from typing import List
 import time
 import numpy as np
 import pickle
-from collections import defaultdict
 
-from typing import Optional, List, Type
+from typing import List
 import ray
 
 import torch
-from torch import nn
 
 
-import pandas as pd
 
-import psutil
 
-import sys
-from kafka import KafkaConsumer
-import msgpack
 
 from ralf.operator import Operator, DEFAULT_STATE_CACHE_SIZE
 from ralf.operators import (
     Source,
-    TumblingWindow,
-    LeftJoin,
 )
 from ralf.state import Record, Schema
 from ralf.core import Ralf
@@ -36,7 +27,6 @@ from dpr.models import init_biencoder_components
 from dpr.options import (
     add_encoder_params,
     setup_args_gpu,
-    print_args,
     set_encoder_params_from_state,
     add_tokenizer_params,
     add_cuda_params,
@@ -47,7 +37,6 @@ from dpr.utils.model_utils import (
     get_model_obj,
     move_to_device,
 )
-from dpr.utils.data_utils import Tensorizer
 
 
 @ray.remote

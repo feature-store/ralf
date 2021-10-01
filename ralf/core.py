@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Set
 import os
 import time
 from pprint import pformat
@@ -10,7 +10,7 @@ import wandb
 
 import ray
 
-from ralf.table import deploy_queryable_server
+from ralf.table import Table, deploy_queryable_server
 
 
 class Ralf:
@@ -48,7 +48,7 @@ class Ralf:
         print(f"Storing operators metrics at {metric_dir}")
         return metric_dir
 
-    def _visit_all_tables(self):
+    def _visit_all_tables(self) -> Set[Table]:
         """Returns all tables registered with Ralf.
         Sometimes Ralf adds operators to user's graph, like mapper, window, that is not
         visible inside this instance.
@@ -176,15 +176,17 @@ class Ralf:
     def run(self):
         print(pformat(self.pipeline_view()))
 
-        deploy_queryable_server()
+        if any(table.is_queryable for table in self._visit_all_tables()):
+            deploy_queryable_server()
+
         # pull data from sources
         for table in self.tables.values():
             if table.is_source():
                 table.pool.broadcast("_next")
 
-    def deploy(self, table: "Table", name: str):
+    def deploy(self, table: Table, name: str):
         # TODO: only execute tables/ops which are deployed
         self.tables[name] = table
 
-    def get_table(self, name: str) -> "Table":
+    def get_table(self, name: str) -> Table:
         return self.tables[name]

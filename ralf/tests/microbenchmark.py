@@ -1,4 +1,4 @@
-from typing import Optional, List
+from typing import Optional
 from pprint import pprint
 import asyncio
 import time
@@ -6,14 +6,12 @@ import time
 import numpy as np
 
 import ray
-from ray.util.queue import Queue, Empty
 
-from ralf.operator import Operator, DEFAULT_STATE_CACHE_SIZE
+from ralf.operator import Operator
 from ralf.operators import Source
 from ralf.table import Table
 from ralf.core import Ralf
 from ralf.state import Schema, Record
-from ralf.policies import processing_policy, load_shedding_policy
 
 
 @ray.remote(num_cpus=0)

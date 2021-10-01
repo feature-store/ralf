@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
-import traceback
 from collections import OrderedDict
-from typing import List, Optional, Type, Callable
+from typing import Callable, List, Optional
 from queue import PriorityQueue
 from concurrent.futures import ThreadPoolExecutor
 import asyncio

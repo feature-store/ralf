@@ -1,4 +1,3 @@
-import sys
 import random
 import numpy as np
 from tqdm import tqdm
@@ -8,8 +7,6 @@ import json
 import time
 
 import threading
-from multiprocessing import Pool
-import psutil
 
 from ralf.client import RalfClient
 

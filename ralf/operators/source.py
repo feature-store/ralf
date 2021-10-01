@@ -6,7 +6,7 @@ from typing import List
 from ray.actor import ActorHandle
 
 from ralf.operator import Operator, DEFAULT_STATE_CACHE_SIZE
-from ralf.state import TableState, Record, Schema
+from ralf.state import Record, Schema
 
 
 class Source(Operator, ABC):
@@ -42,7 +42,6 @@ class Source(Operator, ABC):
         Records are automatically sent to downstream operators.
         Should raise an exception when the source runs out of input.
         """
-        pass
 
     def query(self, source_handle: ActorHandle, key: str):
         raise NotImplementedError
