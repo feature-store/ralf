@@ -1,18 +1,17 @@
+import asyncio
+import hashlib
 from abc import ABC, abstractmethod
 from collections import OrderedDict
-from typing import Callable, List, Optional
-from queue import PriorityQueue
 from concurrent.futures import ThreadPoolExecutor
-import asyncio
+from queue import PriorityQueue
+from typing import Callable, List, Optional
 
+import psutil
 import ray
 from ray.actor import ActorHandle
-import psutil
 
-import hashlib
-
-from ralf.state import TableState, Record, Schema
-from ralf.policies import processing_policy, load_shedding_policy
+from ralf.policies import load_shedding_policy, processing_policy
+from ralf.state import Record, Schema, TableState
 
 DEFAULT_STATE_CACHE_SIZE: int = 1000
 

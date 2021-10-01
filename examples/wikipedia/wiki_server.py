@@ -1,39 +1,33 @@
+import argparse
 import json
 import os
-import argparse
-from typing import List
-import time
-import numpy as np
 import pickle
-
+import time
 from typing import List
+
+import numpy as np
 import ray
-
 import torch
-
-
-from ralf.operator import Operator, DEFAULT_STATE_CACHE_SIZE
-from ralf.operators import (
-    Source,
-)
-from ralf.state import Record, Schema
-from ralf.core import Ralf
-from ralf.table import Table
-
 from dpr.models import init_biencoder_components
 from dpr.options import (
-    add_encoder_params,
-    setup_args_gpu,
-    set_encoder_params_from_state,
-    add_tokenizer_params,
     add_cuda_params,
+    add_encoder_params,
+    add_tokenizer_params,
+    set_encoder_params_from_state,
+    setup_args_gpu,
 )
 from dpr.utils.model_utils import (
-    setup_for_distributed_mode,
-    load_states_from_checkpoint,
     get_model_obj,
+    load_states_from_checkpoint,
     move_to_device,
+    setup_for_distributed_mode,
 )
+
+from ralf.core import Ralf
+from ralf.operator import DEFAULT_STATE_CACHE_SIZE, Operator
+from ralf.operators import Source
+from ralf.state import Record, Schema
+from ralf.table import Table
 
 
 @ray.remote
@@ -303,10 +297,6 @@ class GroupByDoc(Operator):
 
 def from_file(send_rate: int, f: str):
     return Table([], EditSource, send_rate, f)
-
-
-def from_kafka(topic: str):
-    return Table([], KafkaSource, topic)
 
 
 def write_metadata(args, ex_dir):

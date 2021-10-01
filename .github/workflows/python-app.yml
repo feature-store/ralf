@@ -15,9 +15,9 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install black
+        pip install black isort flake8
         # Skip dep install for now.
         # if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-    - name: Format check with black
+    - name: Format check with black, isort, and flake8
       run: |
-        black --check .
+        make lint

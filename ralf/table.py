@@ -1,15 +1,15 @@
 import asyncio
+import json
 from itertools import chain
 from typing import Dict, List
-import json
-import numpy as np
 
-from ray import serve
 import fastapi
+import numpy as np
 from fastapi import FastAPI
+from ray import serve
 
-from ralf.operator import Operator, ActorPool
-from ralf.operators import LeftJoin, SlidingWindow, Print
+from ralf.operator import ActorPool, Operator
+from ralf.operators import LeftJoin, Print, SlidingWindow
 from ralf.state import Record
 
 _queryable_tables: Dict[str, "Table"] = dict()

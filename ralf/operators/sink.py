@@ -1,6 +1,4 @@
-
-
-from ralf.operator import Operator, DEFAULT_STATE_CACHE_SIZE
+from ralf.operator import DEFAULT_STATE_CACHE_SIZE, Operator
 from ralf.state import Record, Schema
 
 

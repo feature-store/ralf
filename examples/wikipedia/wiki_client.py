@@ -1,7 +1,5 @@
 import argparse
 
-
-
 from ralf.client import RalfClient
 
 client = RalfClient()

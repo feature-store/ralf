@@ -1,9 +1,10 @@
-from typing import Any, Dict, Optional, List, Type
-import time
 import logging
+import time
+from typing import Any, Dict, List, Optional, Type
+
 import ray
 
-from ralf.operator import Operator, DEFAULT_STATE_CACHE_SIZE
+from ralf.operator import DEFAULT_STATE_CACHE_SIZE, Operator
 from ralf.state import Record, Schema
 
 logger = logging.getLogger()

@@ -1,20 +1,18 @@
-import random
-import numpy as np
-from tqdm import tqdm
 import argparse
-import os
 import json
+import os
+import random
+import threading
 import time
 
-import threading
+import msgpack
+import numpy as np
+import redis
+import wandb
+from kafka import KafkaProducer
+from tqdm import tqdm
 
 from ralf.client import RalfClient
-
-from kafka import KafkaProducer
-import msgpack
-import redis
-
-import wandb
 
 client = RalfClient()
 

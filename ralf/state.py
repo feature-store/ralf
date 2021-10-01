@@ -1,5 +1,5 @@
-from typing import Dict, Type, Any, List
 import time
+from typing import Any, Dict, List, Type
 
 
 class Record:

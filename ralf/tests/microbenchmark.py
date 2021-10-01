@@ -1,17 +1,16 @@
-from typing import Optional
-from pprint import pprint
 import asyncio
 import time
+from pprint import pprint
+from typing import Optional
 
 import numpy as np
-
 import ray
 
+from ralf.core import Ralf
 from ralf.operator import Operator
 from ralf.operators import Source
+from ralf.state import Record, Schema
 from ralf.table import Table
-from ralf.core import Ralf
-from ralf.state import Schema, Record
 
 
 @ray.remote(num_cpus=0)

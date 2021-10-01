@@ -1,10 +1,10 @@
-from typing import Dict, DefaultDict, List
 from collections import defaultdict
+from typing import DefaultDict, Dict, List
 
 import simpy
 
-from ralf.state import Record
 from ralf.simulation.priority_queue import PerKeyPriorityQueue
+from ralf.state import Record
 
 KeyType = int
 

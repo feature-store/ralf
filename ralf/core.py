@@ -1,14 +1,13 @@
-from typing import Optional, Set
+import json
 import os
 import time
-from pprint import pformat
 from collections import deque
 from itertools import chain
-import json
-
-import wandb
+from pprint import pformat
+from typing import Optional, Set
 
 import ray
+import wandb
 
 from ralf.table import Table, deploy_queryable_server
 

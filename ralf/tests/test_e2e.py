@@ -1,17 +1,16 @@
-from typing import Optional, List
 import time
+from typing import List, Optional
 
 import pytest
-
 import ray
-from ray.util.queue import Queue, Empty
+from ray.util.queue import Empty, Queue
 
-from ralf.operator import Operator, DEFAULT_STATE_CACHE_SIZE
-from ralf.operators import Source
-from ralf.table import Table
 from ralf.core import Ralf
-from ralf.state import Schema, Record
-from ralf.policies import processing_policy, load_shedding_policy
+from ralf.operator import DEFAULT_STATE_CACHE_SIZE, Operator
+from ralf.operators import Source
+from ralf.policies import load_shedding_policy, processing_policy
+from ralf.state import Record, Schema
+from ralf.table import Table
 
 
 @ray.remote
