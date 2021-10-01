@@ -116,5 +116,5 @@ class SlidingWindow(Operator):
                 return window_record
             else:
                 self.windows[key] = window
-        except Exception as e:
+        except Exception:
             logger.exception("Exception in sliding window")

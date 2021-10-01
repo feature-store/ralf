@@ -12,9 +12,6 @@ import ray
 import torch
 
 
-
-
-
 from ralf.operator import Operator, DEFAULT_STATE_CACHE_SIZE
 from ralf.operators import (
     Source,
@@ -217,7 +214,6 @@ class Retriever(Operator):
     def on_record(self, record: Record) -> Record:
 
         try:
-            st = time.time()
             batch_token_tensors = [self.tensorizer.text_to_tensor(record.pass_text)]
 
             ctx_ids_batch = move_to_device(
@@ -335,7 +331,7 @@ def create_doc_pipeline(args):
     pass_embeddings = passages.map(Retriever, args, num_replicas=8).as_queryable(
         "pass_embedding"
     )
-    doc_embeddings = pass_embeddings.map(GroupByDoc).as_queryable("doc_embedding")
+    pass_embeddings.map(GroupByDoc).as_queryable("doc_embedding")
 
     # deploy
     ralf_conn.deploy(source, "source")
