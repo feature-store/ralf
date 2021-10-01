@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import List, Optional
 
-from ralf.operator import Operator, ActorPool, DEFAULT_STATE_CACHE_SIZE
-from ralf.state import TableState, Record, Schema
+from ralf.operator import DEFAULT_STATE_CACHE_SIZE, ActorPool, Operator
+from ralf.state import Record, Schema, TableState
 
 
 class LeftJoin(Operator, ABC):

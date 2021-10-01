@@ -1,10 +1,9 @@
-from abc import ABC, abstractmethod
 from typing import Optional, Type
 
 import ray
 
-from ralf.operator import Operator, DEFAULT_STATE_CACHE_SIZE
-from ralf.state import TableState, Record, Schema
+from ralf.operator import DEFAULT_STATE_CACHE_SIZE, Operator
+from ralf.state import Record, Schema
 
 
 @ray.remote

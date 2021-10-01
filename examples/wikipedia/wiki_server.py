@@ -1,53 +1,33 @@
+import argparse
 import json
 import os
-import argparse
-from typing import List
-import time
-import numpy as np
 import pickle
-from collections import defaultdict
+import time
+from typing import List
 
-from typing import Optional, List, Type
+import numpy as np
 import ray
-
 import torch
-from torch import nn
-
-
-import pandas as pd
-
-import psutil
-
-import sys
-from kafka import KafkaConsumer
-import msgpack
-
-from ralf.operator import Operator, DEFAULT_STATE_CACHE_SIZE
-from ralf.operators import (
-    Source,
-    TumblingWindow,
-    LeftJoin,
-)
-from ralf.state import Record, Schema
-from ralf.core import Ralf
-from ralf.table import Table
-
 from dpr.models import init_biencoder_components
 from dpr.options import (
-    add_encoder_params,
-    setup_args_gpu,
-    print_args,
-    set_encoder_params_from_state,
-    add_tokenizer_params,
     add_cuda_params,
+    add_encoder_params,
+    add_tokenizer_params,
+    set_encoder_params_from_state,
+    setup_args_gpu,
 )
 from dpr.utils.model_utils import (
-    setup_for_distributed_mode,
-    load_states_from_checkpoint,
     get_model_obj,
+    load_states_from_checkpoint,
     move_to_device,
+    setup_for_distributed_mode,
 )
-from dpr.utils.data_utils import Tensorizer
+
+from ralf.core import Ralf
+from ralf.operator import DEFAULT_STATE_CACHE_SIZE, Operator
+from ralf.operators import Source
+from ralf.state import Record, Schema
+from ralf.table import Table
 
 
 @ray.remote
@@ -228,7 +208,6 @@ class Retriever(Operator):
     def on_record(self, record: Record) -> Record:
 
         try:
-            st = time.time()
             batch_token_tensors = [self.tensorizer.text_to_tensor(record.pass_text)]
 
             ctx_ids_batch = move_to_device(
@@ -320,10 +299,6 @@ def from_file(send_rate: int, f: str):
     return Table([], EditSource, send_rate, f)
 
 
-def from_kafka(topic: str):
-    return Table([], KafkaSource, topic)
-
-
 def write_metadata(args, ex_dir):
     # write experiment metadata
     metadata = {"pipeline": "wikipedia"}
@@ -346,7 +321,7 @@ def create_doc_pipeline(args):
     pass_embeddings = passages.map(Retriever, args, num_replicas=8).as_queryable(
         "pass_embedding"
     )
-    doc_embeddings = pass_embeddings.map(GroupByDoc).as_queryable("doc_embedding")
+    pass_embeddings.map(GroupByDoc).as_queryable("doc_embedding")
 
     # deploy
     ralf_conn.deploy(source, "source")

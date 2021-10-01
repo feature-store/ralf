@@ -3,17 +3,17 @@ import sys
 from typing import Optional
 
 import simpy
+
 from ralf.policies.load_shedding_policy import (
     always_process,
     make_mean_policy,
     make_sampling_policy,
 )
 from ralf.policies.processing_policy import fifo, lifo, make_sorter_with_key_weights
+from ralf.simulation.mapper import RalfMapper, RoundRobinLoadBalancer
 from ralf.simulation.priority_queue import PerKeyPriorityQueue
 from ralf.simulation.source import Source
 from ralf.simulation.window import WindowOperator
-from ralf.simulation.mapper import RalfMapper, RoundRobinLoadBalancer
-
 
 policies = {
     "fifo": fifo,
@@ -47,7 +47,7 @@ def run_once(
         )
         for i in range(num_keys)
     }
-    s = Source(
+    Source(
         env,
         records_per_sec_per_key=per_key_records_per_second,
         num_keys=num_keys,
@@ -57,7 +57,7 @@ def run_once(
         if key is not None
         else None,
     )
-    w = WindowOperator(
+    WindowOperator(
         env,
         window_size=window_size,
         slide_size=slide_size,
@@ -98,7 +98,10 @@ if __name__ == "__main__":
                     for slide in slide_sizes:
                         for runtime in model_runtimes:
                             for rate in records_per_second:
-                                out_path = f"./plan-{prio_policy}-{load_shed_policy}-{keys}-{window}-{slide}-{runtime}-{rate}.json"
+                                out_path = (
+                                    f"./plan-{prio_policy}-{load_shed_policy}-"
+                                    f"{keys}-{window}-{slide}-{runtime}-{rate}.json"
+                                )
                                 print("running", out_path)
                                 plan = run_once(
                                     "query_aware",  # prio_policy,
@@ -119,7 +122,10 @@ if __name__ == "__main__":
                                 # This is for key-specific policies (where the policy needs to see they keys' data)
                                 # for key in range(1, 100, 1):
 
-                                #    out_path = f"/home/ubuntu/flink-feature-flow/RayServer/plans/plan-{prio_policy}-{load_shed_policy}-{keys}-{window}-{slide}-{runtime}-{rate}_{key}.json"
+                                # out_path = (
+                                #     "/home/ubuntu/flink-feature-flow/RayServer/plans/plan-"
+                                #     f"{prio_policy}-{load_shed_policy}-{keys}-{window}-{slide}-{runtime}-{rate}_{key}.json"
+                                # )
                                 #    print("running", out_path)
                                 #    run_once(
                                 #        out_path,
