@@ -13,7 +13,7 @@ import psutil
 import hashlib
 
 from ralf.state import TableState, Record, Schema
-from ralf import processing_policy, load_shedding_policy
+from ralf.policies import processing_policy, load_shedding_policy
 
 DEFAULT_STATE_CACHE_SIZE: int = 1000
 
