@@ -1,16 +1,15 @@
 import asyncio
-from itertools import chain
-from typing import Dict, List, Union
 import json
-import numpy as np
+from itertools import chain
+from typing import Dict, List
 
-import ray
-from ray import serve
 import fastapi
+import numpy as np
 from fastapi import FastAPI
+from ray import serve
 
-from ralf.operator import Operator, ActorPool
-from ralf.operators import LeftJoin, SlidingWindow, Print
+from ralf.operator import ActorPool, Operator
+from ralf.operators import LeftJoin, Print, SlidingWindow
 from ralf.state import Record
 
 _queryable_tables: Dict[str, "Table"] = dict()
@@ -40,6 +39,7 @@ class Table:
         self.parents = parents
         self.children = []
         self._is_source = len(parents) == 0
+        self.is_queryable = False
 
     def __repr__(self) -> str:
         return f"Table({self.operator.__ray_metadata__.class_name})"
@@ -130,6 +130,7 @@ class Table:
 
     def as_queryable(self, table_name):
         _queryable_tables[table_name] = self
+        self.is_queryable = True
         return self
 
 

@@ -1,69 +1,24 @@
+import argparse
 import json
 import os
-import argparse
-from typing import List
 import time
-import numpy as np
-import pickle
 from collections import defaultdict
+from typing import List, Optional
 
-from typing import Optional, List, Type
+import numpy as np
+import pandas as pd
+import psutil
 import ray
-
+import redis
 from statsmodels.tsa.seasonal import STL, DecomposeResult
 
-import pandas as pd
-
-import psutil
-
-import sys
-from kafka import KafkaConsumer
-import msgpack
-import redis
-
-from ralf.operator import Operator, DEFAULT_STATE_CACHE_SIZE
-from ralf.operators import (
-    Source,
-    TumblingWindow,
-    LeftJoin,
-)
-from ralf.state import Record, Schema
 from ralf.core import Ralf
+from ralf.operator import DEFAULT_STATE_CACHE_SIZE, Operator
+from ralf.operators import LeftJoin, Source
+from ralf.operators.source import KafkaSource
+from ralf.policies import load_shedding_policy, processing_policy
+from ralf.state import Record, Schema
 from ralf.table import Table
-from ralf.policies import processing_policy
-from ralf.policies import load_shedding_policy
-
-
-@ray.remote
-class KafkaSource(Source):
-    def __init__(self, topic: str, cache_size=DEFAULT_STATE_CACHE_SIZE):
-        schema = Schema(
-            "key",
-            {
-                "key": str,
-                "value": float,
-                "timestamp": int,
-                "send_time": float,
-                "create_time": float,
-            },
-        )
-        super().__init__(schema, cache_size)
-        self.consumer = KafkaConsumer(
-            topic, bootstrap_servers="localhost:9092", value_deserializer=msgpack.loads
-        )
-
-    def next(self) -> List[Record]:
-
-        event = next(self.consumer)
-        assert isinstance(event.value, dict)
-        record = Record(
-            key=str(event.value["key"]),
-            value=event.value["value"],
-            timestamp=int(event.value["timestamp"]),
-            send_time=event.value["send_time"],
-            create_time=time.time(),
-        )
-        return [record]
 
 
 @ray.remote
@@ -481,20 +436,12 @@ def from_file(num_keys: int, send_rate: int, f: str):
     return Table([], FileReader, num_keys, send_rate, f)
 
 
-def from_folder(num_keys: int, send_rate: int, f: str):
-    return Table([], FolderReader, num_keys, send_rate, f)
-
-
 def from_kafka(topic: str):
     return Table([], KafkaSource, topic, num_replicas=4)
 
 
 def from_redis(topic: str):
     return Table([], RedisSource, topic, num_replicas=2, num_worker_threads=1)
-
-
-def from_folder(num_keys: int, send_rate: int, f: str):
-    return Table([], FolderReader, num_keys, send_rate, f)
 
 
 def write_metadata(args, ex_dir):
@@ -535,19 +482,15 @@ def create_stl_pipeline(args):
     else:
         per_key_slide_size_config = None
 
-    window = source.window(
-        args.window,
-        args.slide,
-        num_replicas=2,
-        num_worker_threads=1,
-        per_key_slide_size=per_key_slide_size_config,
-    ).as_queryable("window")
-    models = window.map(
-        STLTrainer, args.seasonality, num_replicas=4, num_worker_threads=1
-    ).as_queryable("model")
-    # models = source.map(
-    #    STLWindowTrain, args.window, args.slide, args.seasonality, num_replicas=8
-    # ).as_queryable("model")
+    (
+        source.window(
+            args.window,
+            args.slide,
+            num_replicas=2,
+            num_worker_threads=1,
+            per_key_slide_size=per_key_slide_size_config,
+        ).map(STLTrainer, args.seasonality, num_replicas=4, num_worker_threads=1)
+    )
 
     # deploy
     ralf_conn.deploy(source, "source")
