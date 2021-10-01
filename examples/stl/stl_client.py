@@ -101,6 +101,7 @@ def dump_state(data, exp_dir):
         )
     )
 
+
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Specify experiment config")
