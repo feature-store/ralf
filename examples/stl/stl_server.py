@@ -30,8 +30,8 @@ from ralf.operators import (
 from ralf.state import Record, Schema
 from ralf.core import Ralf
 from ralf.table import Table
-from ralf import processing_policy
-from ralf import load_shedding_policy
+from ralf.policies import processing_policy
+from ralf.policies import load_shedding_policy
 
 
 @ray.remote
@@ -156,6 +156,7 @@ class FakeReader(Source):
         except Exception as e:
             print(e)
 
+
 @ray.remote
 class FileReader(Source):
 
@@ -215,6 +216,7 @@ class FileReader(Source):
         else:
             print("STOP ITERATION")
             raise StopIteration
+
 
 @ray.remote
 class STLTrainer(Operator):
@@ -474,17 +476,22 @@ class Logger(Operator):
 def from_synthetic(num_keys: int, send_rate: int):
     return Table([], FakeReader, num_keys, send_rate)
 
+
 def from_file(num_keys: int, send_rate: int, f: str):
     return Table([], FileReader, num_keys, send_rate, f)
+
 
 def from_folder(num_keys: int, send_rate: int, f: str):
     return Table([], FolderReader, num_keys, send_rate, f)
 
+
 def from_kafka(topic: str):
     return Table([], KafkaSource, topic, num_replicas=4)
 
+
 def from_redis(topic: str):
     return Table([], RedisSource, topic, num_replicas=2, num_worker_threads=1)
+
 
 def from_folder(num_keys: int, send_rate: int, f: str):
     return Table([], FolderReader, num_keys, send_rate, f)
@@ -500,6 +507,7 @@ def write_metadata(args, ex_dir):
     metadata["send_rate"] = args.send_rate
     metadata["source_file"] = args.file
     open(os.path.join(ex_dir, "metadata.json"), "w").write(json.dumps(metadata))
+
 
 def create_stl_pipeline(args):
 
