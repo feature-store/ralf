@@ -18,6 +18,6 @@ jobs:
         pip install black isort flake8
         # Skip dep install for now.
         # if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-    - name: Format check with black, isort, and flake8
+    - name: (use make format/lint locally to fix) format and lint
       run: |
         make lint
