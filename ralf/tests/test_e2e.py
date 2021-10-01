@@ -11,7 +11,7 @@ from ralf.operators import Source
 from ralf.table import Table
 from ralf.core import Ralf
 from ralf.state import Schema, Record
-from ralf import processing_policy, load_shedding_policy
+from ralf.policies import processing_policy, load_shedding_policy
 
 
 @ray.remote

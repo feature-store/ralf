@@ -3,12 +3,12 @@ import sys
 from typing import Optional
 
 import simpy
-from ralf.load_shedding_policy import (
+from ralf.policies.load_shedding_policy import (
     always_process,
     make_mean_policy,
     make_sampling_policy,
 )
-from ralf.processing_policy import fifo, lifo, make_sorter_with_key_weights
+from ralf.policies.processing_policy import fifo, lifo, make_sorter_with_key_weights
 from ralf.simulation.priority_queue import PerKeyPriorityQueue
 from ralf.simulation.source import Source
 from ralf.simulation.window import WindowOperator
