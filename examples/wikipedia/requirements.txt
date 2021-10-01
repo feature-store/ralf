@@ -1,0 +1,12 @@
+statsmodels
+ray[serve]
+kafka
+numpy
+requests
+pytest
+pytest-sugar
+ray[default]
+tqdm
+wandb
+git+git://github.com/kl2806/DPR/commit/af3104c1f4d8463dda594f084ecd56a0c68e1778
+pip install transformers==3.0.2

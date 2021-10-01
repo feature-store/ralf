@@ -1,0 +1,10 @@
+statsmodels
+ray[serve]
+kafka
+numpy
+requests
+pytest
+pytest-sugar
+ray[default]
+tqdm
+wandb
