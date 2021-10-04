@@ -9,7 +9,9 @@ from fastapi import FastAPI
 from ray import serve
 
 from ralf.operator import ActorPool, Operator
-from ralf.operators import LeftJoin, Print, SlidingWindow
+from ralf.operators.join import LeftJoin
+from ralf.operators.logging import Print
+from ralf.operators.window import SlidingWindow
 from ralf.state import Record
 
 _queryable_tables: Dict[str, "Table"] = dict()
@@ -97,7 +99,7 @@ class Table:
         slide_size,
         num_replicas=1,
         num_worker_threads=1,
-        per_key_slide_size=None,
+        per_key_slide_size_plan_file=None,
     ):
         child_table = Table(
             [self],
@@ -108,7 +110,7 @@ class Table:
             str,
             num_replicas=num_replicas,
             num_worker_threads=num_worker_threads,
-            per_key_slide_size=per_key_slide_size,
+            per_key_slide_size_plan_file=per_key_slide_size_plan_file,
         )
         self._add_child(child_table)
         return child_table

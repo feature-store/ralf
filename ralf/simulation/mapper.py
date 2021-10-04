@@ -1,6 +1,7 @@
 import abc
 import itertools
 from typing import Dict, List, Tuple, Type
+from dataclasses import dataclass
 
 import simpy
 
@@ -33,6 +34,17 @@ class RoundRobinLoadBalancer(CrossKeyLoadBalancer):
         return key
 
 
+@dataclass
+class PlanEntry:
+    # Map operator attribute
+    processing_time: float
+
+    # Event Attribute
+    window_start_seq_id: int
+    window_end_seq_id: int
+    key: int
+
+
 class RalfMapper:
     def __init__(
         self,
@@ -47,7 +59,7 @@ class RalfMapper:
         self.model_runtime_s = model_run_time_s
         self.env.process(self.run())
 
-        self.ready_time_to_batch: Dict[float, List[Tuple[int, float]]] = {}
+        self.plan: List[PlanEntry] = []
 
     def run(self):
         while True:
@@ -57,7 +69,12 @@ class RalfMapper:
             print(
                 f"at time {self.env.now:.2f}, RalfMapper should work on {windows} (last timestamp)"
             )
-            self.ready_time_to_batch[self.env.now] = [
-                (r.seq_id, r.processing_time, r.key) for r in windows.window
-            ]
+            self.plan.append(
+                PlanEntry(
+                    round(self.env.now, 6),
+                    windows.window[0].seq_id,
+                    windows.window[-1].seq_id,
+                    windows.window[0].key,  # key will be same anyway
+                ).__dict__
+            )
             yield self.env.timeout(self.model_runtime_s)

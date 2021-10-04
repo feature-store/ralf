@@ -8,3 +8,4 @@ pytest-sugar
 ray[default]
 tqdm
 wandb
+absl
