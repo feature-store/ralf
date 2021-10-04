@@ -12,6 +12,7 @@ from ralf.operator import ActorPool, Operator
 from ralf.operators.join import LeftJoin
 from ralf.operators.logging import Print
 from ralf.operators.window import SlidingWindow
+from ralf.operators import LeftJoin, Print, SlidingWindow
 from ralf.state import Record
 
 _queryable_tables: Dict[str, "Table"] = dict()
