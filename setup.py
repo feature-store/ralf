@@ -8,5 +8,8 @@ setup(
     url="https://github.com/sarahwooders/flink-feature-flow/",
     keywords=("feature store streaming machine learning python"),
     packages=find_packages(),
-    install_requires=["ray[serve]", "requests",],
+    install_requires=[
+        "ray[serve]",
+        "requests",
+    ],
 )
