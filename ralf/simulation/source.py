@@ -1,10 +1,8 @@
+import json
+from collections import defaultdict
 from typing import List, Optional
 
 import pandas as pd
-import json
-
-from collections import defaultdict
-
 import simpy
 
 from ralf.state import Record
