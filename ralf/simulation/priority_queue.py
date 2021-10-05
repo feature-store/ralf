@@ -22,10 +22,7 @@ class _SortableRecordWrapper:
 
 class PerKeyPriorityQueue(simpy.Store):
     def __init__(
-        self,
-        env: simpy.Environment,
-        processing_policy=None,
-        load_shedding_policy=None,
+        self, env: simpy.Environment, processing_policy=None, load_shedding_policy=None,
     ):
         self.processing_policy = processing_policy
         self.load_shedding_policy = load_shedding_policy

@@ -22,11 +22,7 @@ class TumblingWindow(Operator):
     ):
         # TODO: generate schema automatically from generics
         schema = Schema(
-            primary_key,
-            {
-                primary_key: primary_key_type,
-                "window": List[Record],
-            },
+            primary_key, {primary_key: primary_key_type, "window": List[Record],},
         )
         super().__init__(schema, cache_size, num_worker_threads=num_worker_threads)
         self.size = size

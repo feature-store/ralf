@@ -96,11 +96,7 @@ def test_processing_policy():
     queue = Queue()
     # send 1 to 10
     source_table = Table([], CounterSource, 10)
-    sink = source_table.map(
-        SlowNoop,
-        queue,
-        processing_policy=processing_policy.lifo,
-    )
+    sink = source_table.map(SlowNoop, queue, processing_policy=processing_policy.lifo,)
 
     ralf.deploy(source_table, "source")
     ralf.deploy(sink, "sink")
