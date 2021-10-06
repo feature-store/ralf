@@ -1,8 +1,11 @@
 import abc
 import itertools
-from typing import Dict, List, Tuple, Type
+import random
+from dataclasses import dataclass
+from typing import Dict, List, Type
 
 import simpy
+from more_itertools import chunked
 
 from ralf.simulation.priority_queue import PerKeyPriorityQueue
 
@@ -33,6 +36,18 @@ class RoundRobinLoadBalancer(CrossKeyLoadBalancer):
         return key
 
 
+@dataclass
+class PlanEntry:
+    # Map operator attribute
+    processing_time: float
+    replica_id: int
+
+    # Event Attribute
+    window_start_seq_id: int
+    window_end_seq_id: int
+    key: int
+
+
 class RalfMapper:
     def __init__(
         self,
@@ -40,24 +55,42 @@ class RalfMapper:
         source_queues: Dict[KeyType, PerKeyPriorityQueue],
         key_selection_policy_cls: Type[CrossKeyLoadBalancer],
         model_run_time_s: float,
+        num_replicas: int = 1,
     ) -> None:
         self.env = env
-        self.source_queues = source_queues
+        self.total_source_queues = source_queues
+        assert len(source_queues) >= num_replicas
+
+        # Shard source queues into each replica's id.
+        source_keys = list(source_queues.keys())
+        random.shuffle(source_keys)
+        self.sharded_keys = dict(enumerate(chunked(source_keys, num_replicas)))
+
         self.key_selection_policy = key_selection_policy_cls()
         self.model_runtime_s = model_run_time_s
-        self.env.process(self.run())
+        for i in range(num_replicas):
+            self.env.process(self.run(replica_id=i))
 
-        self.ready_time_to_batch: Dict[float, List[Tuple[int, float]]] = {}
+        self.plan: List[PlanEntry] = []
 
-    def run(self):
+    def run(self, replica_id: int):
+        this_shard_source_queues = {
+            key: self.total_source_queues[key] for key in self.sharded_keys[replica_id]
+        }
         while True:
             # windows = yield self.source_queue.get()
-            chosen_key = self.key_selection_policy.choose(self.source_queues)
-            windows = yield self.source_queues[chosen_key].get()
+            chosen_key = self.key_selection_policy.choose(this_shard_source_queues)
+            windows = yield self.total_source_queues[chosen_key].get()
             print(
-                f"at time {self.env.now:.2f}, RalfMapper should work on {windows} (last timestamp)"
+                f"at time {self.env.now:.2f}, RalfMapper {replica_id} should work on {windows} (last timestamp)"
             )
-            self.ready_time_to_batch[self.env.now] = [
-                (r.seq_id, r.processing_time, r.key) for r in windows.window
-            ]
+            self.plan.append(
+                PlanEntry(
+                    round(self.env.now, 6),
+                    replica_id,
+                    windows.window[0].seq_id,
+                    windows.window[-1].seq_id,
+                    windows.window[0].key,  # key will be same anyway
+                ).__dict__
+            )
             yield self.env.timeout(self.model_runtime_s)
