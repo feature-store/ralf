@@ -38,11 +38,11 @@ class Ralf:
         else:
             assert os.path.isdir(metric_dir)
 
-        LATEST_PATH = "/tmp/ralf/latest"
-        if os.path.exists(LATEST_PATH):
-            os.remove(LATEST_PATH)
-        os.makedirs("/tmp/ralf", exist_ok=True)
-        os.symlink(metric_dir, LATEST_PATH, target_is_directory=True)
+        # LATEST_PATH = "/tmp/ralf/latest"
+        # if os.path.exists(LATEST_PATH):
+        #     os.remove(LATEST_PATH)
+        # os.makedirs("/tmp/ralf", exist_ok=True)
+        # os.symlink(metric_dir, LATEST_PATH, target_is_directory=True)
 
         print(f"Storing operators metrics at {metric_dir}")
         return metric_dir

@@ -13,7 +13,7 @@ from ray.actor import ActorHandle
 from ralf.policies import load_shedding_policy, processing_policy
 from ralf.state import Record, Schema, TableState
 
-DEFAULT_STATE_CACHE_SIZE: int = 1000
+DEFAULT_STATE_CACHE_SIZE: int = 0
 
 # This should represent a pool of sharded operators.
 class ActorPool:

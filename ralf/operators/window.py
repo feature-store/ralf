@@ -1,6 +1,7 @@
+import json
 import logging
 import time
-from typing import Any, Dict, List, Optional, Type
+from typing import List, Optional, Type
 
 import ray
 
@@ -60,7 +61,7 @@ class SlidingWindow(Operator):
         primary_key_type: Type,
         cache_size=DEFAULT_STATE_CACHE_SIZE,
         num_worker_threads: int = 1,
-        per_key_slide_size: Optional[Dict[Any, int]] = None,
+        per_key_slide_size_plan_file: Optional[str] = None,
     ):
         """
         Args:
@@ -84,7 +85,9 @@ class SlidingWindow(Operator):
         self.windows = {}
         self.max_create_time = {}
         self.max_timestamp = {}
-        self.per_key_slide_size = per_key_slide_size
+        if per_key_slide_size_plan_file:
+            with open(per_key_slide_size_plan_file) as f:
+                self.per_key_slide_size = json.load(f)
 
     def on_record(self, record) -> Optional[Record]:
         try:

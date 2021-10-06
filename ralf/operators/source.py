@@ -4,6 +4,7 @@ import traceback
 from abc import ABC, abstractmethod
 from typing import List
 
+import pandas as pd
 import ray
 from ray.actor import ActorHandle
 
@@ -82,3 +83,111 @@ class KafkaSource(Source):
             create_time=time.time(),
         )
         return [record]
+
+
+@ray.remote
+class FakeReader(Source):
+    def __init__(
+        self, num_keys, send_rate, timesteps=10000, cache_size=DEFAULT_STATE_CACHE_SIZE
+    ):
+
+        schema = Schema(
+            "key",
+            {
+                "key": str,
+                "value": float,
+                "timestamp": int,
+                "create_time": float,
+                "send_time": float,
+            },
+        )
+
+        super().__init__(schema, cache_size, num_worker_threads=1)
+        self.num_keys = int(num_keys)
+        self.send_rate = int(send_rate)
+        self.timesteps = int(timesteps)
+        self.ts = 0
+
+    def next(self):
+        try:
+            if self.ts < self.timesteps * self.send_rate:
+                records = []
+                for key in range(self.num_keys):
+                    t = time.time()
+                    record = Record(
+                        key=str(key),
+                        value=1,
+                        timestamp=self.ts,
+                        create_time=t,
+                        send_time=t,
+                    )
+                    records.append(record)
+                self.ts += 1
+                time.sleep(1 / self.send_rate)
+                return records
+            else:
+                print("STOP ITERATION")
+                raise StopIteration
+        except Exception as e:
+            print(e)
+
+
+@ray.remote
+class FileReader(Source):
+
+    # Given a single key from the dataset, duplicates that stream to num_keys
+
+    def __init__(
+        self,
+        num_keys,
+        send_rate,
+        filename,
+        cache_size=DEFAULT_STATE_CACHE_SIZE,
+    ):
+        schema = Schema(
+            "key",
+            {
+                "key": str,
+                "value": float,
+                "timestamp": int,
+                "create_time": float,
+                "send_time": float,
+            },
+        )
+
+        super().__init__(schema, cache_size, num_worker_threads=1)
+
+        print("Reading CSV", filename)
+
+        df = pd.read_csv(filename)
+        self.data = []
+        for index, row in df.iterrows():
+            self.data.append(row.to_dict())
+        self.send_rate = send_rate
+        self.num_keys = num_keys
+        self.ts = 0
+
+    def next(self):
+        if self.ts < len(self.data):
+            d = self.data[self.ts]
+            records = []
+            for k in range(self.num_keys):
+                value = float(d["value"])
+                timestamp = int(d["timestamps"])
+                key = str(k)
+                curr_time = time.time()
+                records.append(
+                    Record(
+                        key=key,
+                        value=value,
+                        timestamp=timestamp,
+                        create_time=curr_time,
+                        send_time=curr_time,  # duplicated to be consistent with KafkaSource
+                    )
+                )
+            self.ts += 1
+            time.sleep(1 / self.send_rate)
+            return records
+        else:
+            print("STOP ITERATION")
+            raise StopIteration
