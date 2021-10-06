@@ -1,5 +1,5 @@
-from collections import defaultdict
 import json
+from collections import defaultdict
 from typing import DefaultDict, Dict, List, Optional
 
 import simpy

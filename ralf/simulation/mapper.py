@@ -1,8 +1,8 @@
 import abc
-import random
 import itertools
-from typing import Dict, List, Tuple, Type
+import random
 from dataclasses import dataclass
+from typing import Dict, List, Type
 
 import simpy
 from more_itertools import chunked
