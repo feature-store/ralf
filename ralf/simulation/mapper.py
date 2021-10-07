@@ -3,6 +3,7 @@ import itertools
 import random
 from dataclasses import dataclass
 from typing import Dict, List, Type
+from more_itertools.more import divide
 
 import simpy
 from more_itertools import chunked
@@ -64,7 +65,9 @@ class RalfMapper:
         # Shard source queues into each replica's id.
         source_keys = list(source_queues.keys())
         random.shuffle(source_keys)
-        self.sharded_keys = dict(enumerate(chunked(source_keys, num_replicas)))
+        self.sharded_keys = dict(
+            enumerate(map(list, divide(num_replicas, source_keys)))
+        )
 
         self.key_selection_policy = key_selection_policy_cls()
         self.model_runtime_s = model_run_time_s

@@ -31,8 +31,20 @@ class PerKeyPriorityQueue(simpy.Store):
         self.load_shedding_policy = load_shedding_policy
 
         self.last_value = None
+        self.waiters = []
 
         super().__init__(env)
+
+    def size(self):
+        return len(self.items)
+
+    def wait(self) -> simpy.Event:
+        event = simpy.Event(self._env)
+        if self.size() == 0:
+            self.waiters.append(event)
+        else:
+            event.succeed()
+        return event
 
     def _do_put(self, event):
         # Insert sorted.
@@ -40,6 +52,9 @@ class PerKeyPriorityQueue(simpy.Store):
             self.items, _SortableRecordWrapper(event.item, self.processing_policy)
         )
         event.succeed()
+
+        [waiter.succeed() for waiter in self.waiters]
+        self.waiters.clear()
 
     def _do_get(self, event):
         if self.items:
