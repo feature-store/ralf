@@ -69,7 +69,7 @@ class RalfMapper:
             enumerate(map(list, divide(num_replicas, source_keys)))
         )
 
-        self.key_selection_policy = key_selection_policy_cls()
+        self.key_selection_policy = key_selection_policy_cls 
         self.model_runtime_s = model_run_time_s
         for i in range(num_replicas):
             self.env.process(self.run(replica_id=i))
