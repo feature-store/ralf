@@ -27,6 +27,8 @@ class WindowOperator:
             self.per_key_slide_size_dict = json.load(open(per_key_slide_size_path))
         else:
             self.per_key_slide_size_dict = {}
+
+        print("WINDOW", self.per_key_slide_size_dict)
         self.source_queue = source_queue
         self.windows: DefaultDict[int, List[float]] = defaultdict(list)
         self.next_queues = next_queues
@@ -53,6 +55,7 @@ class WindowOperator:
                     self.per_key_slide_size_dict.get(str(item.key))
                     or self.global_slide_size
                 )
+                print("slide size", item.key, slide_size)
                 self.windows[item.key] = self.windows[item.key][slide_size:]
 
             # NOTE(simon): edit this timeout for "window process time"

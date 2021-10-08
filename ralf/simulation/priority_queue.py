@@ -38,6 +38,10 @@ class PerKeyPriorityQueue(simpy.Store):
     def size(self):
         return len(self.items)
 
+    def clear(self): 
+        self.items.clear()
+        self.waiters.clear()
+
     def wait(self) -> simpy.Event:
         event = simpy.Event(self._env)
         if self.size() == 0:
