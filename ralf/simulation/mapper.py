@@ -83,7 +83,9 @@ class RalfMapper:
         }
         while True:
 
-            yield simpy.AnyOf(self.env, [q.wait() for q in this_shard_source_queues.values()])
+            yield simpy.AnyOf(
+                self.env, [q.wait() for q in this_shard_source_queues.values()]
+            )
 
             # windows = yield self.source_queue.get()
             chosen_key = self.key_selection_policy.choose(this_shard_source_queues)

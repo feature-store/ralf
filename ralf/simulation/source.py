@@ -1,7 +1,7 @@
 import json
+import os
 from collections import defaultdict
 from typing import List, Optional
-import os
 
 import pandas as pd
 import simpy
@@ -31,7 +31,7 @@ class Source:
 
         if data_dir is not None:
             self.data = {}
-            for key in keys: 
+            for key in keys:
                 self.data[key] = []
                 data_file = os.path.join(data_dir, f"{key}.csv")
                 df = pd.read_csv(data_file)
@@ -39,7 +39,7 @@ class Source:
                     self.data[key].append(row.to_dict())
                 print("Read", len(self.data[key]), data_file)
 
-        for key in self.keys: 
+        for key in self.keys:
             assert len(self.data[key]) == len(self.data[self.keys[0]])
         self.ts_len = len(self.data[self.keys[0]])
 
