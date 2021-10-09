@@ -5,7 +5,6 @@ from dataclasses import dataclass
 from typing import Dict, List, Type
 
 import simpy
-from more_itertools import chunked
 from more_itertools.more import divide
 
 from ralf.simulation.priority_queue import PerKeyPriorityQueue
