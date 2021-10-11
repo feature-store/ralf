@@ -65,18 +65,18 @@ class Ralf:
     def pipeline_view(self):
         view = {repr(table): table.debug_state() for table in self._visit_all_tables()}
         # actor_state is fetch in parallel, let's block and get all of them here.
-        states = ray.get(
-            list(
-                chain.from_iterable(
-                    [value["actors_state_ref"] for value in view.values()]
-                )
-            )
-        )
-        for value in view.values():
-            pool_size = value["actor_pool_size"]
-            state, states = states[:pool_size], states[pool_size:]
-            value["actor_state"] = state
-            del value["actors_state_ref"]
+        # states = ray.get(
+        #     list(
+        #         chain.from_iterable(
+        #             [value["actors_state_ref"] for value in view.values()]
+        #         )
+        #     )
+        # )
+        # for value in view.values():
+        #     pool_size = value["actor_pool_size"]
+        #     state, states = states[:pool_size], states[pool_size:]
+        #     value["actor_state"] = state
+        #     del value["actors_state_ref"]
         return view
 
     def snapshot(self):

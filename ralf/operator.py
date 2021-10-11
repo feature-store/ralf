@@ -1,13 +1,19 @@
 import asyncio
+import pickle
 import hashlib
+import socket
 from abc import ABC, abstractmethod
 from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import closing
 from queue import PriorityQueue
+import threading
+from time import sleep
 from typing import Callable, List, Optional
 
 import psutil
 import ray
+import zmq
 from ray.actor import ActorHandle
 
 from ralf.policies import load_shedding_policy, processing_policy
@@ -15,26 +21,54 @@ from ralf.state import Record, Schema, TableState
 
 DEFAULT_STATE_CACHE_SIZE: int = 0
 
+
 # This should represent a pool of sharded operators.
 class ActorPool:
-    def __init__(self, handles: List[ActorHandle]):
+    def __init__(self, handles: List[ActorHandle], debug_ports):
         self.handles = handles
         self._lazy = ray.get(handles[0].is_lazy.remote())
+        self.debug_ports = debug_ports
+        self.sockets = []
+
+    def _init_sockets(self):
+        self.context = zmq.Context()
+        self.sockets = [
+            self.context.socket(zmq.REQ) for _ in range(len(self.debug_ports))
+        ]
+        for sock, port in zip(self.sockets, self.debug_ports):
+            sock.connect(f"tcp://localhost:{port}")
+
+    def __reduce__(self):
+        # sockets are not serializable.
+        return ActorPool, (self.handles, self.debug_ports)
 
     @classmethod
     def make_replicas(cls, num_replicas, actor_class, *init_args, **init_kwargs):
         assert num_replicas > 0
 
         handles = [
-            actor_class.options(max_concurrency=int(1e9)).remote(
-                *init_args, **init_kwargs
-            )
+            actor_class.options(max_concurrency=6).remote(*init_args, **init_kwargs)
             for _ in range(num_replicas)
         ]
+        debug_port_refs = []
         for i, handle in enumerate(handles):
             handle.set_current_actor_handle.remote(handle)
             handle.set_shard_idx.remote(i)
-        return cls(handles)
+            debug_port_refs.append(handle.get_debug_port.remote())
+        debug_ports = ray.get(debug_port_refs)
+        return cls(handles, debug_ports)
+
+    def debug_state(self):
+        # lazily init sockets
+        if len(self.sockets) == 0:
+            self._init_sockets()
+
+        debug_states = []
+        for socket in self.sockets:
+            socket.send(b" ")
+            debug_message = socket.recv()
+            debug_states.append(pickle.loads(debug_message))
+        return debug_states
 
     def hash_key(self, key: str) -> int:
         # TODO: Figure out hashing for non-string keys
@@ -151,6 +185,26 @@ class Operator(ABC):
         self.proc = psutil.Process()
         self.proc.cpu_percent()
 
+        # Zmq debug server
+        self.debug_port_ready = threading.Event()
+
+        def serve_in_thread():
+            self.socket = zmq.Context().socket(zmq.REP)
+            self.debug_port = self.socket.bind_to_random_port("tcp://*")
+            self.debug_port_ready.set()
+
+            while True:
+                self.socket.recv()
+                msg = pickle.dumps(self.debug_state())
+                self.socket.send(msg)
+
+        self.debug_thread = threading.Thread(target=serve_in_thread, daemon=True)
+        self.debug_thread.start()
+
+    def get_debug_port(self) -> int:
+        self.debug_port_ready.wait()
+        return self.debug_port
+
     def set_shard_idx(self, shard_idx: int):
         self._shard_idx = shard_idx
 
@@ -198,7 +252,7 @@ class Operator(ABC):
             else:
                 self.send(result)
 
-    async def _on_record(self, record: Record):
+    def _on_record(self, record: Record):
         event = Event(
             lambda: self._on_record_helper(record), record, self._processing_policy
         )
@@ -256,25 +310,25 @@ class Operator(ABC):
 
     # Table data query functions
 
-    async def get(self, key: str):
-        if self._lazy:
-            # Bug: stateful operators that produce output dependent on an
-            # ordered lineage of parent records.
-            parent_records = await asyncio.gather(
-                *[parent.get_async(key) for parent in self.get_parents()]
-            )
+    # async def get(self, key: str):
+    #     if self._lazy:
+    #         # Bug: stateful operators that produce output dependent on an
+    #         # ordered lineage of parent records.
+    #         parent_records = await asyncio.gather(
+    #             *[parent.get_async(key) for parent in self.get_parents()]
+    #         )
 
-            # Force the thread pool to quickly service the requests.
-            # TODO: submit via the events queue to prioritize requests.
-            futures = []
-            for parent_record in parent_records:
-                task = self._thread_pool.submit(self._on_record_helper, parent_record)
-                futures.append(asyncio.wrap_future(task))
-            await asyncio.gather(*futures)
+    #         # Force the thread pool to quickly service the requests.
+    #         # TODO: submit via the events queue to prioritize requests.
+    #         futures = []
+    #         for parent_record in parent_records:
+    #             task = self._thread_pool.submit(self._on_record_helper, parent_record)
+    #             futures.append(asyncio.wrap_future(task))
+    #         await asyncio.gather(*futures)
 
-        record = self._table.point_query(key)
-        return record
+    #     record = self._table.point_query(key)
+    #     return record
 
-    def get_all(self):
-        # TODO: Generate missing values
-        return self._table.bulk_query()
+    # def get_all(self):
+    #     # TODO: Generate missing values
+    #     return self._table.bulk_query()

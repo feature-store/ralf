@@ -54,7 +54,7 @@ class Table:
             "is_source": self.is_source(),
             "operator_args": [str(arg) for arg in self.args],
             "operator_kwargs": {k: str(v) for k, v in self.kwargs.items()},
-            "actors_state_ref": self.pool.broadcast("debug_state"),
+            "actors_state": self.pool.debug_state(),
             "actor_pool_size": len(self.pool.handles),
         }
 

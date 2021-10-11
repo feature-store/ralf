@@ -85,6 +85,7 @@ class SlidingWindow(Operator):
         self.windows = {}
         self.max_create_time = {}
         self.max_timestamp = {}
+        self.per_key_slide_size = None
         if per_key_slide_size_plan_file:
             with open(per_key_slide_size_plan_file) as f:
                 self.per_key_slide_size = json.load(f)

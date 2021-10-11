@@ -16,7 +16,7 @@ class Source(Operator, ABC):
     def __init__(self, schema: Schema, cache_size=DEFAULT_STATE_CACHE_SIZE, **kwargs):
         super().__init__(schema, cache_size, lazy=False, **kwargs)
 
-    async def _next(self):
+    def _next(self):
         """Runs the source by iteratively invoking next().
 
         Schedules the subsequent run of next() via Ray so that the actor
@@ -32,8 +32,6 @@ class Source(Operator, ABC):
             # TODO(peter): optimize by adding batch send.
             for record in records:
                 self.send(record)
-            # Yield the coroutine so it can be queried.
-            await asyncio.sleep(0)
 
     def on_record(self, record: Record):
         pass
