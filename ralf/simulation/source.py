@@ -102,7 +102,9 @@ class JSONSource:
                 print(
                     f"Complete source ts: {self.index}/{len(self.data)}, env time: {self.env.now}/{self.total_run_time}"
                 )
-                open("optimal_plan.json", "w").write(json.dumps(self.optimal_plan))
+                open("/data/wooders/wikipedia/optimal_plan.json", "w").write(
+                    json.dumps(self.optimal_plan)
+                )
                 break
 
             # send for each key at timestep

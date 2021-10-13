@@ -21,19 +21,24 @@ class CrossKeyLoadBalancer(abc.ABC):
 class RoundRobinLoadBalancer(CrossKeyLoadBalancer):
     """Simple policy that cycle through all the keys fairly"""
 
-    def __init__(self):
-        self.cur_key_set = set()
-        self.cur_key_iter = None
+    def __init__(self, num_replicas=1):
+        self.cur_key_iter = {}
+        self.cur_key_set = {}
+        for replica_id in range(num_replicas):
+            self.cur_key_set[replica_id] = set()
+            self.cur_key_iter[replica_id] = None
 
-    def choose(self, per_key_queues: Dict[KeyType, PerKeyPriorityQueue]) -> KeyType:
+    def choose(
+        self, per_key_queues: Dict[KeyType, PerKeyPriorityQueue], replica_id: int
+    ) -> KeyType:
         key_set = set(per_key_queues.keys())
-        if key_set != self.cur_key_set:
-            self.cur_key_set = key_set
-            self.cur_key_iter = itertools.cycle(key_set)
+        if key_set != self.cur_key_set[replica_id]:
+            self.cur_key_set[replica_id] = key_set
+            self.cur_key_iter[replica_id] = itertools.cycle(key_set)
 
-        key = next(self.cur_key_iter)
+        key = next(self.cur_key_iter[replica_id])
         while per_key_queues[key].size() == 0:
-            key = next(self.cur_key_iter)
+            key = next(self.cur_key_iter[replica_id])
         # TODO(simon): maybe do a "peak" here to trigger eviction policies
         return key
 
@@ -87,7 +92,9 @@ class RalfMapper:
             )
 
             # windows = yield self.source_queue.get()
-            chosen_key = self.key_selection_policy.choose(this_shard_source_queues)
+            chosen_key = self.key_selection_policy.choose(
+                this_shard_source_queues, replica_id
+            )
             windows = yield self.total_source_queues[chosen_key].get()
             print(
                 f"at time {self.env.now:.2f}, RalfMapper {replica_id} should work on {windows} (last timestamp)"
