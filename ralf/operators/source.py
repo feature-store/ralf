@@ -50,6 +50,9 @@ class Source(Operator, ABC):
         raise NotImplementedError
 
 
+SourceOperator = Source
+
+
 @ray.remote
 class KafkaSource(Source):
     def __init__(self, topic: str, cache_size=DEFAULT_STATE_CACHE_SIZE):

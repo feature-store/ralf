@@ -151,6 +151,10 @@ class Operator(ABC):
         self.proc = psutil.Process()
         self.proc.cpu_percent()
 
+    def set_load_shedding(self, policy_cls):
+        self._load_shedding_policy_obj = policy_cls()
+        self._load_shedding_policy = self._load_shedding_policy_obj.process
+
     def set_shard_idx(self, shard_idx: int):
         self._shard_idx = shard_idx
 

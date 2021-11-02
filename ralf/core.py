@@ -189,3 +189,8 @@ class Ralf:
 
     def get_table(self, name: str) -> Table:
         return self.tables[name]
+
+    def create_source(self, operator_class, args=None):
+        table = Table([], operator_class, *args)
+        self.deploy(table, "source")
+        return table

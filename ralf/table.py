@@ -7,11 +7,14 @@ import fastapi
 import numpy as np
 from fastapi import FastAPI
 from ray import serve
+import ray
+from ray.actor import ActorClass
 
 from ralf.operator import ActorPool, Operator
 from ralf.operators.join import LeftJoin
 from ralf.operators.logging import Print
 from ralf.operators.window import SlidingWindow
+from ralf.policies.base import LoadSheddingPolicy
 from ralf.state import Record
 
 _queryable_tables: Dict[str, "Table"] = dict()
@@ -30,6 +33,9 @@ class Table:
             self.num_replicas = operator_kwargs["num_replicas"]
             del operator_kwargs["num_replicas"]
 
+        if not isinstance(operator, ActorClass):
+            operator = ray.remote(operator)
+
         # TODO: Add schema info
         self.operator = operator
         self.args = operator_args
@@ -42,6 +48,11 @@ class Table:
         self.children = []
         self._is_source = len(parents) == 0
         self.is_queryable = False
+
+    def add_load_shedding(self, policy_class):
+        assert issubclass(policy_class, LoadSheddingPolicy)
+        self.pool.broadcast("set_load_shedding", policy_class)
+        return self
 
     def __repr__(self) -> str:
         return f"Table({self.operator.__ray_metadata__.class_name})"
@@ -67,6 +78,8 @@ class Table:
         return self._is_source
 
     def map(self, operator: Operator, *operator_args, **operator_kwargs):
+        if operator_kwargs.get("args"):
+            operator_args = operator_kwargs.pop("args")
         child_table = Table([self], operator, *operator_args, **operator_kwargs)
         self._add_child(child_table)
         return child_table
