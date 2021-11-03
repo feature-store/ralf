@@ -7,7 +7,6 @@ from pprint import pformat
 from typing import Optional, Set
 
 import ray
-import wandb
 
 from ralf.table import Table, deploy_queryable_server
 
@@ -28,6 +27,7 @@ class Ralf:
 
         self.log_wandb = log_wandb
         if self.log_wandb:
+            import wandb
             wandb.init(project="stl", entity="ucb-ralf", group=exp_id)
             wandb.run.name = exp_id
 
