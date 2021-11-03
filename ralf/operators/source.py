@@ -4,7 +4,6 @@ import traceback
 from abc import ABC, abstractmethod
 from typing import List
 
-import pandas as pd
 import ray
 from ray.actor import ActorHandle
 
@@ -90,6 +89,7 @@ class FakeReader(Source):
     def __init__(
         self, num_keys, send_rate, timesteps=10000, cache_size=DEFAULT_STATE_CACHE_SIZE
     ):
+        import pandas as pd
 
         schema = Schema(
             "key",
