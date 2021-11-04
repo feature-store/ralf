@@ -1,9 +1,11 @@
 import asyncio
 import hashlib
 from abc import ABC, abstractmethod
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from queue import PriorityQueue
+import random
+import threading
 from typing import Callable, List, Optional
 
 import psutil
@@ -131,11 +133,13 @@ class Operator(ABC):
         self._cache_size = cache_size
         self._lru = OrderedDict()
         self._lazy = lazy
-        self._events = PriorityQueue()
+        self._events = defaultdict(PriorityQueue)
+        self._empty_queue_event = threading.Event()
         self._running = True
         self._thread_pool = ThreadPoolExecutor(num_worker_threads)
         self._processing_policy = processing_policy
         self._load_shedding_policy = load_shedding_policy
+        self._intra_key_priortization = lambda keys: random.choice(keys)
         if not self._lazy:
             for _ in range(num_worker_threads):
                 self._thread_pool.submit(self._worker)
@@ -151,9 +155,13 @@ class Operator(ABC):
         self.proc = psutil.Process()
         self.proc.cpu_percent()
 
-    def set_load_shedding(self, policy_cls):
-        self._load_shedding_policy_obj = policy_cls()
+    def set_load_shedding(self, policy_cls, *args, **kwargs):
+        self._load_shedding_policy_obj = policy_cls(*args, **kwargs)
         self._load_shedding_policy = self._load_shedding_policy_obj.process
+
+    def set_intra_key_prioritization(self, policy_cls, *args, **kwargs):
+        self._intra_key_priortization_obj = policy_cls(*args, **kwargs)
+        self._intra_key_priortization = self._intra_key_priortization_obj.choose
 
     def set_shard_idx(self, shard_idx: int):
         self._shard_idx = shard_idx
@@ -171,13 +179,19 @@ class Operator(ABC):
             "cache_size": self._cache_size,
             "lazy": self._lazy,
             "thread_pool_size": self._thread_pool._max_workers,
-            "queue_size": self._events.qsize(),
+            "queue_size": {k: v.qsize() for k, v in self._events.items()},
         }
 
     def _worker(self):
         """Continuously processes events."""
         while self._running:
-            event = self._events.get()
+            non_empty_queues = [k for k, v in self._events.items() if v.qsize() > 0]
+            if len(non_empty_queues) == 0:
+                self._empty_queue_event.wait()
+                continue
+            chosen_key = self._intra_key_priortization(non_empty_queues)
+            event = self._events[chosen_key].get()
+            self._empty_queue_event.clear()
             if self._table.schema is not None:
                 key = getattr(event.record, self._table.schema.primary_key)
                 try:
@@ -206,7 +220,9 @@ class Operator(ABC):
         event = Event(
             lambda: self._on_record_helper(record), record, self._processing_policy
         )
-        self._events.put(event)
+        key = record.entries[self._table.schema.primary_key]
+        self._events[key].put(event)
+        self._empty_queue_event.set()
 
     def send(self, record: Record):
         key = getattr(record, self._table.schema.primary_key)

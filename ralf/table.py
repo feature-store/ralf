@@ -14,7 +14,7 @@ from ralf.operator import ActorPool, Operator
 from ralf.operators.join import LeftJoin
 from ralf.operators.logging import Print
 from ralf.operators.window import SlidingWindow
-from ralf.policies.base import LoadSheddingPolicy
+from ralf.policies.base import LoadSheddingPolicy, PrioritizationPolicy
 from ralf.state import Record
 
 _queryable_tables: Dict[str, "Table"] = dict()
@@ -49,9 +49,16 @@ class Table:
         self._is_source = len(parents) == 0
         self.is_queryable = False
 
-    def add_load_shedding(self, policy_class):
+    def add_load_shedding(self, policy_class, *args, **kwargs):
         assert issubclass(policy_class, LoadSheddingPolicy)
-        self.pool.broadcast("set_load_shedding", policy_class)
+        self.pool.broadcast("set_load_shedding", policy_class, *args, **kwargs)
+        return self
+
+    def add_prioritization_policy(self, policy_class, *args, **kwargs):
+        assert issubclass(policy_class, PrioritizationPolicy)
+        self.pool.broadcast(
+            "set_intra_key_prioritization", policy_class, *args, **kwargs
+        )
         return self
 
     def __repr__(self) -> str:
