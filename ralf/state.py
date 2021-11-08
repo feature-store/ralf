@@ -59,7 +59,13 @@ class TableState:
 
     def update(self, record: Record):
         key = getattr(record, self.schema.primary_key)
-        self.records[key] = record
+        # self.records[key] = record
+        value_tuple = (record, time.time())
+        if key not in self.records: 
+            self.records[key] = [value_tuple]
+        else: 
+            self.records[key].append(value_tuple)
+        # print("value_tuple:", value_tuple, "end")
 
         self.num_updates += 1
         self.num_records = len(self.records)
@@ -74,7 +80,8 @@ class TableState:
     def point_query(self, key) -> Record:
         if key not in self.records:
             raise KeyError(f"Key {key} not found.")
-        return self.records[key]
+        # return self.records[key]
+        return self.records[key][-1][0]
 
     def bulk_query(self) -> List[Record]:
         return list(self.records.values())
