@@ -5,10 +5,15 @@ class RalfClient:
     def __init__(self) -> None:
         self.base_url = "http://localhost:8000/table"
 
+    def update_send(self, *, table_name, user_id, movie_id):
+        url = f"{self.base_url}/{table_name}/{user_id}/{movie_id}"
+        print(f"querying {url}...")
+        return requests.put(url).json() 
+
     def point_query(self, *, table_name, key):
         url = f"{self.base_url}/{table_name}/{key}"
         print(f"querying {url}...")
-        return requests.get(url).json()
+        return requests.get(url).json() 
 
     def bulk_query(self, *, table_name):
         url = f"{self.base_url}/{table_name}"

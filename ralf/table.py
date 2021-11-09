@@ -126,6 +126,12 @@ class Table:
 
     async def get_async(self, key):
         return await self.pool.get_async(key)
+    
+    async def send_async(self, user_id, movie_id):
+        print("see me in table send_asyncccc")
+        awaited_result = await self.pool.send_async(user_id, movie_id)
+        print("see me in table send_asyncccc before return")
+        return awaited_result
 
     async def get_all_async(self):
         return await asyncio.gather(*self.pool.get_all_async())
@@ -156,8 +162,27 @@ def deploy_queryable_server():
             # Of course we can update it dynamically as well in the future.
             self._queryable_tables = _queryable_tables
 
+        @app.put("/table/{table_name}/{user_id}/{movie_id}")
+        async def update_send(self, table_name: str, user_id: str, movie_id: str):
+            print("see me in update_senddddd")
+            if table_name not in self._queryable_tables:
+                print("table_name not in self._queryable_tablesssss")
+                return fastapi.responses.JSONResponse(
+                    {
+                        "error": f"{table_name} not found, existing tables are {list(self._queryable_tables.keys())}"
+                    },
+                    status_code=404,
+                )
+            print("table_name in self._queryable_tablesssss")
+            resp = await self._queryable_tables[table_name].send_async(user_id, movie_id)
+            print("before returnnn")
+            return fastapi.responses.Response(
+                json.dumps(resp.entries, cls=RalfEncoder), media_type="application/json"
+            )
+
         @app.get("/table/{table_name}/{key}")
         async def point_query(self, table_name: str, key: str):
+            print("see me in movielenssssssss")
             if table_name not in self._queryable_tables:
                 return fastapi.responses.JSONResponse(
                     {

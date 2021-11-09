@@ -51,6 +51,10 @@ class ActorPool:
 
     def get_async(self, key) -> ray.ObjectRef:
         return self.choose_actor(key).get.remote(key)
+    
+    def send_async(self, user_id, movie_id) -> ray.ObjectRef:
+        print("see me in operator send_asyncccccc") # TODO: change this to send the update
+        return self.choose_actor(user_id).get.remote(user_id)
 
     def get_all_async(self) -> List[ray.ObjectID]:
         return [handle.get_all.remote() for handle in self.handles]
