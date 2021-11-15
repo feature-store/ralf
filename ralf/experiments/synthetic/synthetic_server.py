@@ -94,7 +94,7 @@ def create_synthetic_pipeline(queue):
     
     # create pipeline
     # source_table = Table([], CounterSource, 1000000, 3, 1000)
-    source_table = Table([], CounterSource, 1000000, 3000, 100000)
+    source_table = Table([], CounterSource, 1000000, 3000, 100000) #send_up_to, num_keys, send_rate
 
     sink = source_table.map(
         SlowIdentity,

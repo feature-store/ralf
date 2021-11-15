@@ -182,7 +182,7 @@ def deploy_queryable_server():
 
         @app.get("/table/{table_name}/{key}")
         async def point_query(self, table_name: str, key: str):
-            print("see me in movielenssssssss")
+            # print("see me in movielenssssssss")
             if table_name not in self._queryable_tables:
                 return fastapi.responses.JSONResponse(
                     {

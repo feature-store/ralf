@@ -65,7 +65,8 @@ class TableState:
             self.records[key] = [value_tuple]
         else: 
             self.records[key].append(value_tuple)
-        # print("value_tuple:", value_tuple, "end")
+        # print("value_tuple: ", value_tuple, "end")
+        # print("values: ", self.records[key], "endd")
 
         self.num_updates += 1
         self.num_records = len(self.records)
