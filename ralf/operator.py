@@ -204,6 +204,10 @@ class Operator(ABC):
                 event.process()
 
     @abstractmethod
+    def delete_record(self, record: Record):
+        pass
+
+    @abstractmethod
     def on_record(self, record: Record) -> Optional[Record]:
         pass
 
