@@ -2,9 +2,34 @@ import time
 from typing import Any, Dict, List, Type
 
 
+class Scope: 
+
+    def __init__(self, scopes: List[str] = []):
+        self.scopes = scopes
+
+    def check(self, other) -> bool: 
+        for scope in self.scopes: 
+            if scope in other.scopes: 
+                return True
+        return False
+
+    def add(self, scope: str): 
+        self.scopes.append(scope)
+
+    def remove(self, scope): 
+        if scope not in self.scopes:
+            return 
+        del self.scopes[self.scopes.index(scope)]
+
+    def __repr__(self):
+        return f"Scope({self.scopes})"
+
+
+
 class Record:
-    def __init__(self, **entries: Dict[str, Any]):
+    def __init__(self, scope: Scope = None, **entries: Dict[str, Any]):
         self.entries: Dict[str, Any] = entries
+        self._scope = scope
         self._source = None
         self.processing_time = time.time()
 
@@ -15,7 +40,7 @@ class Record:
     #     return str(self.entries)
 
     def __repr__(self):
-        return f"Record({self.entries},processing_time={self.processing_time:.2f})"
+        return f"Record({self.entries},processing_time={self.processing_time:.2f},scope={self._scope})"
 
     def __eq__(self, other: "Record") -> bool:
         return self.entries == other.entries and self._source == other._source

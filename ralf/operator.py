@@ -13,7 +13,7 @@ import ray
 from ray.actor import ActorHandle
 
 from ralf.policies import load_shedding_policy, processing_policy
-from ralf.state import Record, Schema, TableState
+from ralf.state import Record, Schema, TableState, Scope
 
 DEFAULT_STATE_CACHE_SIZE: int = 0
 
@@ -144,6 +144,9 @@ class Operator(ABC):
             for _ in range(num_worker_threads):
                 self._thread_pool.submit(self._worker)
 
+        # Set scopes
+        # self._scope = scope
+
         # Parent tables (source of updates)
         self._parents = []
         # Child tables (descendants who recieve updates)
@@ -209,6 +212,15 @@ class Operator(ABC):
 
     def _on_record_helper(self, record: Record):
         result = self.on_record(record)
+
+        # TODO: Log record/result
+        result_key = getattr(result, self._table.schema.primary_key)
+        with open(
+            f"/Users/sarahwooders/repos/gdpr-ralf/logs/{result_key}.txt", "a"
+        ) as f:
+            print("write", str(record))
+            f.write(str(record) + "\n")
+
         if result is not None:
             if isinstance(result, list):  # multiple output values
                 for res in result:
@@ -246,6 +258,7 @@ class Operator(ABC):
 
         record._source = self._actor_handle
         # Network optimization: only send to non-lazy children.
+        # TODO: Add filter to check scopes
         for child in filter(lambda c: not c.is_lazy(), self._children):
             child.choose_actor(key)._on_record.remote(record)
 

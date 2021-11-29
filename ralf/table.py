@@ -15,7 +15,7 @@ from ralf.operators.join import LeftJoin
 from ralf.operators.logging import Print
 from ralf.operators.window import SlidingWindow
 from ralf.policies.base import LoadSheddingPolicy, PrioritizationPolicy
-from ralf.state import Record
+from ralf.state import Record, Scope
 
 _queryable_tables: Dict[str, "Table"] = dict()
 

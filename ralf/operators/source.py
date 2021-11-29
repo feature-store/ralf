@@ -30,6 +30,7 @@ class Source(Operator, ABC):
                 return
             # TODO(peter): optimize by adding batch send.
             for record in records:
+                # assert isinstance(record, Record) # make sure record is a Record object
                 self.send(record)
             # Yield the coroutine so it can be queried.
             await asyncio.sleep(0)
@@ -147,7 +148,7 @@ class FileReader(Source):
         cache_size=DEFAULT_STATE_CACHE_SIZE,
     ):
         import pandas as pd
-        
+
         schema = Schema(
             "key",
             {
