@@ -54,6 +54,9 @@ class ActorPool:
     def get_async(self, key) -> ray.ObjectRef:
         return self.choose_actor(key).get.remote(key)
 
+    def retract_async(self, key) -> ray.ObjectRef:
+        return self.choose_actor(key).retract_key.remote(key)
+
     def get_all_async(self) -> List[ray.ObjectID]:
         return [handle.get_all.remote() for handle in self.handles]
 
@@ -145,7 +148,8 @@ class Operator(ABC):
                 self._thread_pool.submit(self._worker)
 
         # Set scopes
-        # self._scope = scope
+        self._scopes = None
+        self.parent_key = defaultdict(list)
 
         # Parent tables (source of updates)
         self._parents = []
@@ -157,6 +161,10 @@ class Operator(ABC):
 
         self.proc = psutil.Process()
         self.proc.cpu_percent()
+
+
+    def set_scopes(self, scopes): 
+        self._scopes = scopes
 
     def set_load_shedding(self, policy_cls, *args, **kwargs):
         self._load_shedding_policy_obj = policy_cls(*args, **kwargs)
@@ -206,24 +214,113 @@ class Operator(ABC):
             else:
                 event.process()
 
-    @abstractmethod
-    def delete_record(self, record: Record):
-        pass
+    #@abstractmethod
+    #def delete_record(self, record: Record):
+    #    pass
 
     @abstractmethod
     def on_record(self, record: Record) -> Optional[Record]:
         pass
 
+    
+    # incremental delete to re-calculate record
+    def on_delete_record(self, record: Record): 
+        return "NOT_IMPLEMENTED"
+
+    ## batch update records
+    #def on_records(self, records: List[Record]): 
+    #    return "NOT_IMPLEMENTED"
+
+    #def replay_records(self, key): 
+    #    key = getattr(record, self._table.schema.primary_key)
+    #    with open(
+    #        f"/Users/sarahwooders/repos/gdpr-ralf/logs/{key}.txt", "a"
+    #    ) as f:
+    #        print("write", str(record))
+    #        f.write(str(record) + str(self._scopes) + "\n")
+
+
+
+    #def _on_delete_record_helper(self, record: Record): 
+
+    #    updated_record = on_delete_record(record)
+    #    if updated_record != "NOT_IMPLEMENTED": 
+    #        key = getattr(result, self._table.schema.primary_key)
+    #        with open(
+    #            f"/Users/sarahwooders/repos/gdpr-ralf/logs/{key}.txt", "a"
+    #            ) as f:
+
+    #        records = []
+    #        for line in f.readlines(): 
+    #            records.append(Record(json.loads(line)))
+
+
+    def _delete_record_tree(root_key): 
+
+        self._table.delete(root_key)
+
+        # TODO: get child keys (what was written in current table from that key) from parent_key
+        keys = []
+
+        # delete records in children 
+        for key in keys: 
+            self._table.delete(key) # TODO: when to delete? 
+            child.choose_actor(key).evict.remote(key)
+   
+
+    def on_records(self, records: List[Record]): 
+        for record in records: 
+            self._on_record(record)
+
+    def retract_key(self, key) -> ray.ObjectRef:
+        """ Retract data from current table
+        """
+        # remove
+        self._table.delete(key) 
+
+        # propagate to children
+        for child in self._children:
+            child.choose_actor(key).retract.remote(key)
+
+
+    async def retract(self, key, parent_record: Record = None): 
+   
+        # reconstruct 
+        record = self.on_delete_record(parent_record)
+        print("DELETE", record)
+        if not isinstance(record, Record) or record is None: 
+            # determine keys dependent on upstream parent record
+            parent_keys = self.parent_key[key]
+            print("parent keys", key, parent_keys)
+
+            # get required parent inputs 
+            parent_records = await asyncio.gather(
+                *[parent.get_async(key) for parent in self.get_parents() for key in parent_keys],
+                return_exceptions=True
+            )
+            print("parent records", parent_records)
+
+            # filter out exceptions/missing records
+            parent_records = [rec for rec in parent_records if isinstance(rec, Record)]
+            print("filtered", parent_records)
+
+            # TODO: (Sarah) this seems like it'd result in duplicate computation? 
+            # for each parent deletion we're processing seperately that all affect the same child
+            record = self.on_records(parent_records)
+            print("record", record)
+
+        self._table.delete(key)
+        if record is not None:
+            self._table.update(record)
+        print("TABLE", self._table.records)
+        # call retract on dependent children
+        for child in self._children:
+            child.choose_actor(key).retract.remote(key)
+
     def _on_record_helper(self, record: Record):
         result = self.on_record(record)
 
-        # TODO: Log record/result
-        result_key = getattr(result, self._table.schema.primary_key)
-        with open(
-            f"/Users/sarahwooders/repos/gdpr-ralf/logs/{result_key}.txt", "a"
-        ) as f:
-            print("write", str(record))
-            f.write(str(record) + "\n")
+        self.parent_key[result.key].append(record.key)
 
         if result is not None:
             if isinstance(result, list):  # multiple output values
@@ -233,6 +330,7 @@ class Operator(ABC):
                 self.send(result)
 
     async def _on_record(self, record: Record):
+        print("create event", record)
         event = Event(
             lambda: self._on_record_helper(record), record, self._processing_policy
         )
@@ -242,6 +340,14 @@ class Operator(ABC):
 
     def send(self, record: Record):
         key = getattr(record, self._table.schema.primary_key)
+        # TODO: Log record/result
+        #with open(
+        #    f"/Users/sarahwooders/repos/gdpr-ralf/logs/key-{key}.txt", "a"
+        #) as f:
+        #    print("write", str(record))
+        #    f.write(str(record) + str(self._scopes) + "\n")
+
+
         # update state table
         self._table.update(record)
 
@@ -264,6 +370,7 @@ class Operator(ABC):
         # Network optimization: only send to non-lazy children.
         # TODO: Add filter to check scopes
         for child in filter(lambda c: not c.is_lazy(), self._children):
+            print("sending", key, record)
             child.choose_actor(key)._on_record.remote(record)
 
     def evict(self, key: str):
@@ -292,6 +399,7 @@ class Operator(ABC):
         return self._table.schema
 
     # Table data query functions
+
 
     async def get(self, key: str):
         if self._lazy:

@@ -10,6 +10,12 @@ class RalfClient:
         print(f"querying {url}...")
         return requests.get(url).json()
 
+    def retract(self, *, table_name, key):
+        url = f"{self.base_url}/retract/{table_name}/{key}"
+        print(f"retracting {url}...")
+        return requests.get(url).json()
+
+
     def bulk_query(self, *, table_name):
         url = f"{self.base_url}/{table_name}"
         print(f"querying {url}...")

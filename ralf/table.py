@@ -61,6 +61,12 @@ class Table:
         )
         return self
 
+    def set_scopes(self, scopes: Scope): 
+        self.pool.broadcast(
+            "set_scopes", scopes
+        )
+        return self
+
     def __repr__(self) -> str:
         return f"Table({self.operator.__ray_metadata__.class_name})"
 
@@ -147,6 +153,9 @@ class Table:
     async def get_async(self, key):
         return await self.pool.get_async(key)
 
+    async def retract_async(self, key): 
+        return await self.pool.retract_async(key)
+
     async def get_all_async(self):
         return await asyncio.gather(*self.pool.get_all_async())
 
@@ -189,6 +198,22 @@ def deploy_queryable_server():
             return fastapi.responses.Response(
                 json.dumps(resp.entries, cls=RalfEncoder), media_type="application/json"
             )
+
+        @app.get("/table/retract/{table_name}/{key}")
+        async def retract(self, table_name: str, key: str):
+            if table_name not in self._queryable_tables:
+                return fastapi.responses.JSONResponse(
+                    {
+                        "error": f"{table_name} not found, existing tables are {list(self._queryable_tables.keys())}"
+                    },
+                    status_code=404,
+                )
+            resp = await self._queryable_tables[table_name].retract_async(key)
+            print("RETRACT", resp)
+            return fastapi.responses.Response(
+                    json.dumps({"retracted": True}, cls=RalfEncoder), media_type="application/json"
+            )
+
 
         @app.get("/table/{table_name:str}")
         async def bulk_query(self, table_name: str):

@@ -31,6 +31,7 @@ class Source(Operator, ABC):
             # TODO(peter): optimize by adding batch send.
             for record in records:
                 # assert isinstance(record, Record) # make sure record is a Record object
+                print("sending", record)
                 self.send(record)
             # Yield the coroutine so it can be queried.
             await asyncio.sleep(0)
