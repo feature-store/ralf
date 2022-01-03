@@ -1,6 +1,11 @@
 import time
-from typing import Any, Dict, List, Type
+from typing import Any, Dict, List, Type, String
 
+sql_types = {
+    int: "integer",
+    str: "text",
+    float: "real"
+}
 
 class Record:
     def __init__(self, **entries: Dict[str, Any]):
@@ -9,6 +14,14 @@ class Record:
         self.processing_time = time.time()
 
         for k, v in entries.items():
+            setattr(self, k, v)
+
+    def __init__(self, state: Dict[str, Any], processing_time: float):
+        # to recreate Record objects
+        self.entries: Dict[str, Any] = state
+        self._source = None
+        self.processing_time = processing_time
+        for k, v in state.items():
             setattr(self, k, v)
 
     # def __str__(self):
@@ -37,6 +50,24 @@ class Schema:
         assert (
             schema_columns == record_columns
         ), f"schema columns are {schema_columns} but record has {record_columns}"
+    
+    def sql_check(self) -> bool:
+        for _, v in self.columns:
+            if v not in sql_types:
+                return False
+        return True 
+    
+    def sql_format_primary_key(self) -> String:
+        val = self.columns[self.primary_key]
+        return "{self.primary_key} {val}"
+
+    def sql_format(self) -> String:
+        query = []
+        for k, v in self.columns:
+            query.append("{k} {v}")
+        return ", ".join(query)
+        
+        
 
 
 # Maintains table values
