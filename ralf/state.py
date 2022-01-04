@@ -17,6 +17,7 @@ class Record:
             setattr(self, k, v)
 
     def __init__(self, state: Dict[str, Any], processing_time: float):
+        # Currently we don't save the _source—not sure how to represent
         # to recreate Record objects
         self.entries: Dict[str, Any] = state
         self._source = None
@@ -36,6 +37,20 @@ class Record:
     # TODO: Uhh this makes ray not work
     # def __dict__(self):
     #    return self.entries
+
+    def sql_update_format(self) -> String:
+        query = []
+        for k, v in entries.items():
+            query.append("{k} = {v}")
+        query.append("processing_time = {self.processing_time}")
+        return ", ".join(query)
+    
+    def sql_values(self) -> String:
+        query = []
+        for _, v in entries.items():
+            query.append(str(v))
+        query.append(str(self.processing_time))
+        return ", ".join(query)
 
 
 class Schema:
@@ -58,17 +73,17 @@ class Schema:
         return True 
     
     def sql_format_primary_key(self) -> String:
-        val = self.columns[self.primary_key]
+        val = sql_types[self.columns[self.primary_key]]
         return "{self.primary_key} {val}"
 
     def sql_format(self) -> String:
         query = []
         for k, v in self.columns:
-            query.append("{k} {v}")
+            sql_type = sql_types[v]
+            query.append("{k} {sql_type}")
+        query.append("processing_time real")
         return ", ".join(query)
         
-        
-
 
 # Maintains table values
 # TODO: This should eventually be a wrapper around a DB connection
