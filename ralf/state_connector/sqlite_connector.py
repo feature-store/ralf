@@ -2,7 +2,6 @@ from ralf.state_connector.connector import Connector
 from ralf.state import Record, Schema
 from typing import List, Tuple
 import sqlite3
-from ray.actor import ActorHandle
 
 class SQLiteConnector(Connector):
 
@@ -20,9 +19,16 @@ class SQLiteConnector(Connector):
                                     ({table_format})''')
         self.sql_conn.commit()
 
-    def on_update(self, record: Record):
+    def update(self, record: Record):
         # modify for historical
-        pass
+        curr = self.sql_conn.cursor()
+        update_format = record.sql_update_format()
+        values = record.sql_values(
+        curr.execute('''IF EXISTS(SELECT * FROM {self.table_name} WHERE {self.primary_key} = {record.key}) 
+                            UPDATE {self.table_name} SET {update_format} WHERE {self.primary_key} = {record.key}
+                        ELSE
+                            INSERT INTO {self.table_name} VALUES ({values})''')
+        self.sql_conn.commit()
 
     def delete(self, key: str):
         # modify for historical
@@ -30,27 +36,28 @@ class SQLiteConnector(Connector):
         curr.execute("DELETE FROM {self.table_name} WHERE {self.primary_key} = {key}")
         self.sql_conn.commit()
 
-    def to_record(self, row: Tuple) -> Record:
+    def row_to_record(self, row: Tuple):
         schema_columns_repeated = [self.schema.primary_key] + self.schema.columns.keys())
         schema_columns = list(dict.fromkeys(schema_columns_repeated)) # without the duplicate primary key
         entries = dict()
         for i in range(len(schema_columns)):
             entries[schema_columns[i]] = row[i]
-        Record(entries, )
+        processing_time = row[-1]
+        return Record(entries, processing_time)
 
     def point_query(self, key) -> Record:
         # modify for historical
         curr = self.sql_conn.cursor()
         row = curr.execute("SELECT * FROM {self.table_name} WHERE {self.primary_key} = {key}").fetch_one()
-        record = [self.to_record(i) for i in rows]
-        pass
+        record = self.row_to_record(i, schema)
+        return record
 
 
     def bulk_query(self) -> List[Record]:
         # modify for historical
         curr = self.sql_conn.cursor()
         rows = curr.execute("SELECT * FROM {self.table_name}").fetch_all()
-        records = [self.to_record(i) for i in rows]
+        records = [self.row_to_record(i) for i in rows]
         return records
 
     

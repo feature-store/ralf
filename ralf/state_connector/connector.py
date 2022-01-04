@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Type
 class Connector(ABC):
 
     @abstractmethod
-    def on_update(self, record: Record):
+    def update(self, record: Record):
         pass
 
     @abstractmethod
@@ -22,5 +22,8 @@ class Connector(ABC):
 
     def get_schema(self) -> Schema:
         return self.schema
+    
+    def get_historical(self) -> bool:
+        return self.historical
     
     
