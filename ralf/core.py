@@ -3,7 +3,6 @@ import os
 import time
 from collections import deque
 from itertools import chain
-from pprint import pformat
 from typing import Optional, Set
 
 import ray
@@ -94,6 +93,8 @@ class Ralf:
         )
 
         if self.log_wandb:
+            import wandb
+
             wandb.log({"snapshot_duration": snapshot_duration})
             wandb.log({"raw_json": wandb.Html(serialized)})
             for actor_name in data.keys():

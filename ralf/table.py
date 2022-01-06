@@ -5,9 +5,9 @@ from typing import Dict, List
 
 import fastapi
 import numpy as np
+import ray
 from fastapi import FastAPI
 from ray import serve
-import ray
 from ray.actor import ActorClass
 
 from ralf.operator import ActorPool, Operator
