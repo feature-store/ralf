@@ -22,4 +22,4 @@ jobs:
         make lint
     - name: Test installable
       run: |
-        pip install -r . --verbose
+        pip install -e . --verbose
