@@ -27,6 +27,7 @@ class WindowOperator:
             self.per_key_slide_size_dict = json.load(open(per_key_slide_size_path))
         else:
             self.per_key_slide_size_dict = {}
+
         self.source_queue = source_queue
         self.windows: DefaultDict[int, List[float]] = defaultdict(list)
         self.next_queues = next_queues
