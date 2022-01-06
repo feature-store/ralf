@@ -1,13 +1,14 @@
 import time
-from typing import List, Optional
+from typing import Counter, List, Optional
 
 import pytest
 import ray
 from ray.util.queue import Empty, Queue
 
+from ralf import PrioritizationPolicy
 from ralf.core import Ralf
 from ralf.operator import DEFAULT_STATE_CACHE_SIZE, Operator
-from ralf.operators import Source
+from ralf.operators.source import Source
 from ralf.policies import load_shedding_policy, processing_policy
 from ralf.state import Record, Schema
 from ralf.table import Table
@@ -36,7 +37,10 @@ class CounterSource(Source):
 @ray.remote
 class Sink(Operator):
     def __init__(self, result_queue: Queue):
-        super().__init__(schema=None, cache_size=DEFAULT_STATE_CACHE_SIZE)
+        super().__init__(
+            schema=Schema("key", {"key": str, "value": int}),
+            cache_size=DEFAULT_STATE_CACHE_SIZE,
+        )
         self.q = result_queue
 
     def on_record(self, record: Record) -> Optional[Record]:
@@ -137,3 +141,59 @@ def test_load_shedding_policy():
 
     values = [record.value for record in records]
     assert values == [1, 10]
+
+
+def test_intra_key_prioritization_policy():
+    ralf = Ralf()
+    selection_queue = Queue()
+    result_queue = Queue()
+
+    class MyPolicy(PrioritizationPolicy):
+        def choose(self, keys):
+            if "42" in keys:
+                chosen = "42"
+            else:
+                chosen = keys[0]
+            not_chosen = tuple([k for k in keys if k != chosen])
+            selection_queue.put((chosen, not_chosen))
+            return chosen
+
+    @ray.remote
+    class Mixed(Source):
+        def __init__(self, send_up_to: int):
+            self.count = 0
+            self.send_up_to = send_up_to
+            super().__init__(
+                schema=Schema("key", {"key": str, "value": int}),
+                cache_size=DEFAULT_STATE_CACHE_SIZE,
+            )
+
+        def next(self) -> Record:
+            if self.count == 0:
+                # Wait for downstream operators to come online.
+                time.sleep(0.2)
+            self.count += 1
+            if self.count > self.send_up_to:
+                raise StopIteration()
+            if self.count % 2 == 0:
+                key = "42"
+            else:
+                key = "24"
+            return [Record(key=key, value=self.count)]
+
+    # send 1 to 10
+    source_table = Table([], Mixed, 20)
+    sink = source_table.map(
+        Sink,
+        result_queue,
+    )
+    sink.add_prioritization_policy(MyPolicy)
+
+    ralf.deploy(source_table, "source")
+    ralf.deploy(sink, "sink")
+
+    ralf.run()
+
+    counter = Counter([selection_queue.get() for _ in range(20)])
+    # 42 should always be prioritized.
+    assert counter[("42", ("24",))] > 8

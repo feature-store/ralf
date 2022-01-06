@@ -3,7 +3,6 @@ import os
 import time
 from collections import deque
 from itertools import chain
-from pprint import pformat
 from typing import Optional, Set
 
 import ray
@@ -19,7 +18,7 @@ class Ralf:
         exp_id: Optional[str] = None,
     ):
         if not ray.is_initialized():
-            ray.init()
+            ray.init(log_to_driver=False)
         self.tables = {}
 
         self.metric_dir = self._make_metric_dir(metric_dir)
@@ -28,6 +27,7 @@ class Ralf:
         self.log_wandb = log_wandb
         if self.log_wandb:
             import wandb
+
             wandb.init(project="stl", entity="ucb-ralf", group=exp_id)
             wandb.run.name = exp_id
 
@@ -93,6 +93,8 @@ class Ralf:
         )
 
         if self.log_wandb:
+            import wandb
+
             wandb.log({"snapshot_duration": snapshot_duration})
             wandb.log({"raw_json": wandb.Html(serialized)})
             for actor_name in data.keys():
@@ -173,7 +175,7 @@ class Ralf:
         return snapshot_duration
 
     def run(self):
-        print(pformat(self.pipeline_view()))
+        # print(pformat(self.pipeline_view()))
 
         if any(table.is_queryable for table in self._visit_all_tables()):
             deploy_queryable_server()
@@ -189,3 +191,8 @@ class Ralf:
 
     def get_table(self, name: str) -> Table:
         return self.tables[name]
+
+    def create_source(self, operator_class, args=None):
+        table = Table([], operator_class, *args)
+        self.deploy(table, "source")
+        return table
