@@ -5,11 +5,8 @@ setup(
     version="0.0.1",
     author="Ralf Team",
     description=("A feature computation engine."),
-    url="https://github.com/sarahwooders/flink-feature-flow/",
-    keywords=("feature store streaming machine learning python"),
+    url="https://github.com/feature-store/ralf/",
+    keywords=("feature-store streaming machine learning python"),
     packages=find_packages(),
-    install_requires=[
-        "ray[serve]",
-        "requests",
-    ],
+    install_requires=[open("requirements.txt").readlines()],
 )
