@@ -4,6 +4,8 @@ from abc import ABC, abstractmethod
 from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 from queue import PriorityQueue
+from ralf.queue import SingleQueue, KeyQueue
+
 from typing import Callable, List, Optional
 
 import psutil
@@ -132,6 +134,9 @@ class Operator(ABC):
         self._lru = OrderedDict()
         self._lazy = lazy
         self._events = PriorityQueue()
+        #self._events = SingleQueue()
+        #self._events = KeyQueue(keys=[])
+
         self._running = True
         self._thread_pool = ThreadPoolExecutor(num_worker_threads)
         self._processing_policy = processing_policy
@@ -199,9 +204,17 @@ class Operator(ABC):
                 self.send(result)
 
     async def _on_record(self, record: Record):
+        """
+        Create an event and add it to the queue when a record is recieved. 
+
+        :record: Update record to process 
+        """
         event = Event(
             lambda: self._on_record_helper(record), record, self._processing_policy
         )
+        key = getattr(record, self._table.schema.primary_key)
+
+        # pass in key for per-key queues
         self._events.put(event)
 
     def send(self, record: Record):

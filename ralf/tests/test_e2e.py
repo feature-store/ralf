@@ -7,7 +7,7 @@ from ray.util.queue import Empty, Queue
 
 from ralf.core import Ralf
 from ralf.operator import DEFAULT_STATE_CACHE_SIZE, Operator
-from ralf.operators import Source
+from ralf.operators.source import Source
 from ralf.policies import load_shedding_policy, processing_policy
 from ralf.state import Record, Schema
 from ralf.table import Table
@@ -35,8 +35,8 @@ class CounterSource(Source):
 
 @ray.remote
 class Sink(Operator):
-    def __init__(self, result_queue: Queue):
-        super().__init__(schema=None, cache_size=DEFAULT_STATE_CACHE_SIZE)
+    def __init__(self, result_queue: Queue, schema):
+        super().__init__(schema, cache_size=DEFAULT_STATE_CACHE_SIZE)
         self.q = result_queue
 
     def on_record(self, record: Record) -> Optional[Record]:
@@ -77,7 +77,7 @@ def test_mapper():
     queue = Queue()
     # send 1 to 100
     source_table = Table([], CounterSource, 100)
-    sink = source_table.map(Sink, queue)
+    sink = source_table.map(Sink, queue, schema=Schema("key", {"key": str, "value": int}))
 
     ralf.deploy(source_table, "source")
     ralf.deploy(sink, "sink")

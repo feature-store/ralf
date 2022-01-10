@@ -1,4 +1,4 @@
-from ralf import load_shedding_policy
+from ralf.policies import load_shedding_policy
 from ralf.state import Record
 
 

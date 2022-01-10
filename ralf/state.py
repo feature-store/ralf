@@ -43,6 +43,7 @@ class Schema:
 # TODO: This should eventually be a wrapper around a DB connection
 class TableState:
     def __init__(self, schema: Schema):
+        assert schema is not None
         self.schema = schema
         self.records = {}
 
