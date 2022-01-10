@@ -15,7 +15,7 @@ class Record:
     #     return str(self.entries)
 
     def __repr__(self):
-        return f"Record(key={self.key},processing_time={self.processing_time:.2f})"
+        return f"Record({self.entries},processing_time={self.processing_time:.2f})"
 
     def __eq__(self, other: "Record") -> bool:
         return self.entries == other.entries and self._source == other._source

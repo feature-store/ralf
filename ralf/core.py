@@ -3,7 +3,6 @@ import os
 import time
 from collections import deque
 from itertools import chain
-from pprint import pformat
 from typing import Optional, Set
 
 import ray
@@ -15,21 +14,13 @@ class Ralf:
     def __init__(
         self,
         metric_dir: Optional[str] = None,
-        log_wandb: Optional[bool] = False,
-        exp_id: Optional[str] = None,
     ):
         if not ray.is_initialized():
-            ray.init()
+            ray.init(log_to_driver=False)
         self.tables = {}
 
         self.metric_dir = self._make_metric_dir(metric_dir)
         self.metric_file = open(os.path.join(self.metric_dir, "snapshots.jsonl"), "w")
-
-        self.log_wandb = log_wandb
-        if self.log_wandb:
-            import wandb
-            wandb.init(project="stl", entity="ucb-ralf", group=exp_id)
-            wandb.run.name = exp_id
 
     def _make_metric_dir(self, metric_dir: Optional[str] = None):
         if metric_dir is None:
@@ -37,12 +28,6 @@ class Ralf:
             os.makedirs(metric_dir, exist_ok=True)
         else:
             assert os.path.isdir(metric_dir)
-
-        # LATEST_PATH = "/tmp/ralf/latest"
-        # if os.path.exists(LATEST_PATH):
-        #     os.remove(LATEST_PATH)
-        # os.makedirs("/tmp/ralf", exist_ok=True)
-        # os.symlink(metric_dir, LATEST_PATH, target_is_directory=True)
 
         print(f"Storing operators metrics at {metric_dir}")
         return metric_dir
@@ -92,89 +77,12 @@ class Ralf:
             )
         )
 
-        if self.log_wandb:
-            wandb.log({"snapshot_duration": snapshot_duration})
-            wandb.log({"raw_json": wandb.Html(serialized)})
-            for actor_name in data.keys():
-                wandb.log(
-                    {
-                        f"threadpool_size/{actor_name}": wandb.Histogram(
-                            [
-                                data[actor_name]["actor_state"][index][
-                                    "thread_pool_size"
-                                ]
-                                for index in range(data[actor_name]["actor_pool_size"])
-                            ]
-                        )
-                    }
-                )
-                wandb.log(
-                    {
-                        f"queue_size/{actor_name}": wandb.Histogram(
-                            [
-                                data[actor_name]["actor_state"][index]["queue_size"]
-                                for index in range(data[actor_name]["actor_pool_size"])
-                            ]
-                        )
-                    }
-                )
-                wandb.log(
-                    {
-                        f"num_records/{actor_name}": wandb.Histogram(
-                            [
-                                data[actor_name]["actor_state"][index]["table"][
-                                    "num_records"
-                                ]
-                                for index in range(data[actor_name]["actor_pool_size"])
-                            ]
-                        )
-                    }
-                )
-                wandb.log(
-                    {
-                        f"num_updates/{actor_name}": wandb.Histogram(
-                            [
-                                data[actor_name]["actor_state"][index]["table"][
-                                    "num_updates"
-                                ]
-                                for index in range(data[actor_name]["actor_pool_size"])
-                            ]
-                        )
-                    }
-                )
-                wandb.log(
-                    {
-                        f"memory/{actor_name}": wandb.Histogram(
-                            [
-                                data[actor_name]["actor_state"][index]["process"][
-                                    "memory_mb"
-                                ]
-                                for index in range(data[actor_name]["actor_pool_size"])
-                            ]
-                        )
-                    }
-                )
-                wandb.log(
-                    {
-                        f"cpu/{actor_name}": wandb.Histogram(
-                            [
-                                data[actor_name]["actor_state"][index]["process"][
-                                    "cpu_percent"
-                                ]
-                                for index in range(data[actor_name]["actor_pool_size"])
-                            ]
-                        )
-                    }
-                )
-
         self.metric_file.write(serialized)
         self.metric_file.write("\n")
         self.metric_file.flush()
         return snapshot_duration
 
     def run(self):
-        print(pformat(self.pipeline_view()))
-
         if any(table.is_queryable for table in self._visit_all_tables()):
             deploy_queryable_server()
 
@@ -189,3 +97,8 @@ class Ralf:
 
     def get_table(self, name: str) -> Table:
         return self.tables[name]
+
+    def create_source(self, operator_class, args=None):
+        table = Table([], operator_class, *args)
+        self.deploy(table, "source")
+        return table

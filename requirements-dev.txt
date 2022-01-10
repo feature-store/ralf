@@ -1,0 +1,9 @@
+# lint
+black
+isort
+flake8
+autoflake
+mypy
+# testing
+pytest
+pytest-sugar
