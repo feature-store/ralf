@@ -11,12 +11,14 @@ class LeftJoin(Operator, ABC):
         schema: Schema,
         left_schema: Schema,
         right_schema: Schema,
+        connector: Connector,
         cache_size=DEFAULT_STATE_CACHE_SIZE,
         lazy: bool = False,
+        historical: bool = False,
     ):
-        super().__init__(schema, cache_size, lazy)
-        self.left_table = TableState(schema=left_schema)
-        self.right_table = TableState(schema=right_schema)
+        super().__init__(schema, connector, cache_size, lazy, historical)
+        self.left_table = TableState(schema=left_schema, connector, historical)
+        self.right_table = TableState(schema=right_schema, connector, historical)
 
         # handles didn't match if left as ActorHandle, so extract id
         self.left_ids = []
