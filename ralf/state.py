@@ -1,11 +1,8 @@
 import time
-from typing import Any, Dict, List, Type, String
-
-sql_types = {
-    int: "integer",
-    str: "text",
-    float: "real"
-}
+from typing import Any, Dict, List, Type
+from string import ascii_lowercase
+from json import JSONEncoder
+import json
 
 class Record:
     def __init__(self, **entries: Dict[str, Any]):
@@ -14,15 +11,6 @@ class Record:
         self.processing_time = time.time()
 
         for k, v in entries.items():
-            setattr(self, k, v)
-
-    def __init__(self, state: Dict[str, Any], processing_time: float):
-        # Currently we don't save the _source—not sure how to represent
-        # to recreate Record objects
-        self.entries: Dict[str, Any] = state
-        self._source = None
-        self.processing_time = processing_time
-        for k, v in state.items():
             setattr(self, k, v)
 
     # def __str__(self):
@@ -38,25 +26,31 @@ class Record:
     # def __dict__(self):
     #    return self.entries
 
-    def sql_update_format(self) -> String:
+    def sql_update_format(self) -> str:
         query = []
         for k, v in entries.items():
             query.append("{k} = {v}")
         query.append("processing_time = {self.processing_time}")
         return ", ".join(query)
     
-    def sql_values(self) -> String:
+    def sql_values(self) -> str:
         query = []
         for _, v in entries.items():
             query.append(str(v))
         query.append(str(self.processing_time))
         return ", ".join(query)
 
+class RecordEncoder(JSONEncoder):
+    def default(self, object):
+        if isinstance(object, Record):
+            return vars(object)
+        return JSONEncoder.default(self, object)
 
 class Schema:
     def __init__(self, primary_key: str, columns: Dict[str, Type]):
         self.primary_key = primary_key
         self.columns = columns
+        self.name = self.compute_name()
 
     def validate_record(self, record: Record):
         # TODO: add type checking.
@@ -65,62 +59,17 @@ class Schema:
         assert (
             schema_columns == record_columns
         ), f"schema columns are {schema_columns} but record has {record_columns}"
-    
-    def sql_check(self) -> bool:
-        for _, v in self.columns:
-            if v not in sql_types:
-                return False
-        return True 
-    
-    def sql_format_primary_key(self) -> String:
-        val = sql_types[self.columns[self.primary_key]]
-        return "{self.primary_key} {val}"
 
-    def sql_format(self) -> String:
-        query = []
-        for k, v in self.columns:
-            sql_type = sql_types[v]
-            query.append("{k} {sql_type}")
-        query.append("processing_time real")
-        return ", ".join(query)
-        
+    def compute_name(self) -> str:
+        dump = json.dumps(list(self.columns.keys()), sort_keys=True)
+        hash_val = str(abs(hash(dump)))
+        name = ""
+        for c in hash_val:
+            name += ascii_lowercase[int(c)] 
+        return name
 
-# Maintains table values
-# TODO: This should eventually be a wrapper around a DB connection
-class TableState:
-    def __init__(self, schema: Schema):
-        self.schema = schema
-        self.records = {}
+    def get_name(self) -> str:
+        return self.name
 
-        self.num_updates: int = 0
-        self.num_deletes: int = 0
-        self.num_records: int = 0
-
-    def debug_state(self):
-        return {
-            "num_updates": self.num_updates,
-            "num_deletes": self.num_deletes,
-            "num_records": self.num_records,
-        }
-
-    def update(self, record: Record):
-        key = getattr(record, self.schema.primary_key)
-        self.records[key] = record
-
-        self.num_updates += 1
-        self.num_records = len(self.records)
-
-    def delete(self, key: str):
-        self.records.pop(key, None)
-        self.num_deletes += 1
-
-    def get_schema(self) -> Schema:
-        return self.schema
-
-    def point_query(self, key) -> Record:
-        if key not in self.records:
-            raise KeyError(f"Key {key} not found.")
-        return self.records[key]
-
-    def bulk_query(self) -> List[Record]:
-        return list(self.records.values())
+    def __hash__(self) -> int:
+        return hash(self.name)

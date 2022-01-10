@@ -1,7 +1,8 @@
 import pytest
+import sqlite3
 
-from ralf.state import Record, Schema, TableState
-
+from ralf.state import Record, Schema
+from ralf.tables import DictConnector, SQLiteConnector, TableState
 
 def test_record():
     r = Record(a="a", b="b")
@@ -12,15 +13,14 @@ def test_record():
 
 
 def test_schema():
-    schema = Schema(primary_key="key", columns={"a": str, "b": int})
+    schema = Schema(primary_key="key", columns={"key": int, "a": str, "b": int})
 
     schema.validate_record(Record(key=1, a="a", b=1))
     with pytest.raises(AssertionError):
         schema.validate_record(Record(a="a"))
 
-
-def test_table_state():
-    state = TableState(Schema(primary_key="key", columns={"a": str}))
+def test_table_state(connector):
+    state = TableState(Schema(primary_key="key", columns={"key": int, "a": str}), connector, False)
     # test update
     state.update(Record(key=1, a="a"))
     with pytest.raises(AttributeError):
@@ -46,3 +46,16 @@ def test_table_state():
     state.delete(key=2)
     with pytest.raises(KeyError, match="not found"):
         state.point_query(2)
+    assert state.bulk_query() == [
+        Record(key=1, a="a"),
+    ]
+
+def test_dict_connector():
+    connector = DictConnector()
+    test_table_state(connector)
+
+def test_sql_connector():
+    db = "test.db"
+    conn = sqlite3.connect(db)
+    connector = SQLiteConnector(conn)
+    test_table_state(connector)
