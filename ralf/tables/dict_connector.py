@@ -1,7 +1,8 @@
-from ralf.state import Record
-from typing import Any, Dict, List, Type, Union
-from ralf.state import Schema
+from typing import Dict, List, Union
+
+from ralf.state import Record, Schema
 from ralf.tables.connector import Connector
+
 
 class DictConnector(Connector):
     # Ignores historical as a historical in-memory store is impossible
@@ -34,9 +35,7 @@ class DictConnector(Connector):
     def get_all(self, schema: Schema) -> List[Record]:
         records = self.get_records(schema)
         return list(records.values())
-    
+
     def get_num_records(self, schema: Schema) -> int:
         records = self.get_records(schema)
         return len(records.items())
-    
-    

@@ -1,10 +1,10 @@
 from abc import ABC, abstractmethod
-from ralf.state import Record
-from typing import Any, Dict, List, Type, Union
-from ralf.state import Schema
+from typing import List, Union
+
+from ralf.state import Record, Schema
+
 
 class Connector(ABC):
-
     @abstractmethod
     def add_table(self, schema: Schema, historical: bool):
         pass
@@ -24,8 +24,7 @@ class Connector(ABC):
     @abstractmethod
     def get_all(self, schema: Schema) -> List[Record]:
         pass
-    
+
     @abstractmethod
     def get_num_records(self, schema: Schema) -> int:
         pass
-    

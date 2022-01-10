@@ -1,8 +1,10 @@
-import pytest
 import sqlite3
+
+import pytest
 
 from ralf.state import Record, Schema
 from ralf.tables import DictConnector, SQLiteConnector, TableState
+
 
 def test_record():
     r = Record(a="a", b="b")
@@ -19,8 +21,11 @@ def test_schema():
     with pytest.raises(AssertionError):
         schema.validate_record(Record(a="a"))
 
+
 def test_table_state(connector):
-    state = TableState(Schema(primary_key="key", columns={"key": int, "a": str}), connector, False)
+    state = TableState(
+        Schema(primary_key="key", columns={"key": int, "a": str}), connector, False
+    )
     # test update
     state.update(Record(key=1, a="a"))
     with pytest.raises(AttributeError):
@@ -50,9 +55,11 @@ def test_table_state(connector):
         Record(key=1, a="a"),
     ]
 
+
 def test_dict_connector():
     connector = DictConnector()
     test_table_state(connector)
+
 
 def test_sql_connector():
     db = "test.db"
