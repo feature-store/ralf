@@ -89,7 +89,7 @@ class FakeReader(Source):
     def __init__(
         self, num_keys, send_rate, timesteps=10000, cache_size=DEFAULT_STATE_CACHE_SIZE
     ):
-        import pandas as pd
+        pass
 
         schema = Schema(
             "key",

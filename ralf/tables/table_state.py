@@ -1,6 +1,9 @@
-from ralf.state import Schema, Record
 from typing import List
+
+from ralf.state import Record, Schema
 from ralf.tables.connector import Connector
+
+
 # Maintains table values
 # TODO: This should eventually be a wrapper around a DB connection
 class TableState:
@@ -33,7 +36,7 @@ class TableState:
     def point_query(self, key) -> Record:
         val = self.connector.get_one(self.schema, key)
         if not val:
-            raise KeyError(f"Key {key} not found.") 
+            raise KeyError(f"Key {key} not found.")
         return val
 
     def bulk_query(self) -> List[Record]:
@@ -41,6 +44,6 @@ class TableState:
 
     def get_schema(self) -> Schema:
         return self.schema
-    
+
     def get_historical(self) -> bool:
         return self.historical

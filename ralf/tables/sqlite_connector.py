@@ -1,14 +1,12 @@
-from ralf.tables.connector import Connector
-from ralf.state import Record, Schema, RecordEncoder
-from typing import List, Tuple, Union
-import sqlite3
 import json
+import sqlite3
+from typing import List, Union
 
-sql_types = {
-    int: "INTEGER",
-    str: "TEXT",
-    float: "REAL"
-}
+from ralf.state import Record, Schema
+from ralf.tables.connector import Connector
+
+sql_types = {int: "INTEGER", str: "TEXT", float: "REAL"}
+
 
 def schema_sql_format(schema: Schema) -> str:
     query = []
@@ -19,8 +17,8 @@ def schema_sql_format(schema: Schema) -> str:
     query.append("record TEXT")
     return ", ".join(query)
 
-class SQLiteConnector(Connector):
 
+class SQLiteConnector(Connector):
     def __init__(self, conn: sqlite3.Connection):
         self.conn = conn
 
@@ -30,7 +28,6 @@ class SQLiteConnector(Connector):
         if schema.columns[schema.primary_key] not in sql_types:
             raise TypeError("The schema is invalid for SQL")
         if not historical:
-            drop_statement = 'DROP TABLE IF EXISTS {table_name}'
             curr.execute(f"DROP TABLE IF EXISTS {table_name}")
         table_format = schema_sql_format(schema)
         curr.execute(f"CREATE TABLE IF NOT EXISTS {table_name} ({table_format})")
@@ -40,7 +37,9 @@ class SQLiteConnector(Connector):
         curr = self.conn.cursor()
         table_name = schema.get_name()
         jsonString = json.dumps(vars(record))
-        insert_statement = f"INSERT INTO {table_name} (key, record) VALUES ({record.key}, ?)"
+        insert_statement = (
+            f"INSERT INTO {table_name} (key, record) VALUES ({record.key}, ?)"
+        )
         if not historical:
             delete_statement = f"DELETE FROM {table_name} WHERE key = {record.key}"
             curr.execute(delete_statement)
@@ -62,7 +61,7 @@ class SQLiteConnector(Connector):
         if row:
             record = Record(**json.loads(row[0]))
         return record
-        
+
     def get_all(self, schema: Schema) -> List[Record]:
         curr = self.conn.cursor()
         table_name = schema.get_name()
@@ -72,8 +71,6 @@ class SQLiteConnector(Connector):
 
     def get_num_records(self, schema: Schema) -> int:
         curr = self.conn.cursor()
-        table_name = schema.get_name()
+        schema.get_name()
         count = curr.execute("SELECT COUNT(id) FROM {table_name}").fetch_one()
         return count
-    
-    

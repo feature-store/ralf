@@ -10,6 +10,7 @@ from ralf.state import Record, Schema
 
 logger = logging.getLogger()
 
+
 @ray.remote
 class TumblingWindow(Operator):
     def __init__(

@@ -6,6 +6,7 @@ from ralf.operator import DEFAULT_STATE_CACHE_SIZE, Operator
 from ralf.state import Record, Schema
 from ralf.tables import Connector
 
+
 @ray.remote
 class Print(Operator):
     def __init__(

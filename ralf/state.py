@@ -1,8 +1,9 @@
-import time
-from typing import Any, Dict, List, Type
-from string import ascii_lowercase
-from json import JSONEncoder
 import json
+import time
+from json import JSONEncoder
+from string import ascii_lowercase
+from typing import Any, Dict, Type
+
 
 class Record:
     def __init__(self, **entries: Dict[str, Any]):
@@ -32,7 +33,7 @@ class Record:
             query.append("{k} = {v}")
         query.append("processing_time = {self.processing_time}")
         return ", ".join(query)
-    
+
     def sql_values(self) -> str:
         query = []
         for _, v in entries.items():
@@ -40,11 +41,13 @@ class Record:
         query.append(str(self.processing_time))
         return ", ".join(query)
 
+
 class RecordEncoder(JSONEncoder):
     def default(self, object):
         if isinstance(object, Record):
             return vars(object)
         return JSONEncoder.default(self, object)
+
 
 class Schema:
     def __init__(self, primary_key: str, columns: Dict[str, Type]):
@@ -65,7 +68,7 @@ class Schema:
         hash_val = str(abs(hash(dump)))
         name = ""
         for c in hash_val:
-            name += ascii_lowercase[int(c)] 
+            name += ascii_lowercase[int(c)]
         return name
 
     def get_name(self) -> str:
