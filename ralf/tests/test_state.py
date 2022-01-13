@@ -1,9 +1,10 @@
 import sqlite3
 
 import pytest
+import redis
 
 from ralf.state import Record, Schema
-from ralf.tables import DictConnector, SQLiteConnector, TableState
+from ralf.tables import DictConnector, RedisConnector, SQLiteConnector, TableState
 
 
 def test_record():
@@ -28,7 +29,7 @@ def test_table_state(connector):
     )
     # test update
     state.update(Record(key=1, a="a"))
-    with pytest.raises(AttributeError):
+    with pytest.raises(AssertionError):  # what kind of error should be raised?
         state.update(Record(no_primary_key=2))
 
     # test point query
@@ -61,8 +62,14 @@ def test_dict_connector():
     test_table_state(connector)
 
 
-def test_sql_connector():
+def test_sqlite_connector():
     db = "test.db"
     conn = sqlite3.connect(db)
     connector = SQLiteConnector(conn)
+    test_table_state(connector)
+
+
+def test_redis_connector():
+    conn = redis.Redis()
+    connector = RedisConnector(conn)
     test_table_state(connector)

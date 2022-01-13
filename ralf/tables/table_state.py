@@ -26,6 +26,7 @@ class TableState:
         }
 
     def update(self, record: Record):
+        self.schema.validate_record(record)
         self.connector.update(self.schema, self.historical, record)
         self.num_updates += 1
 
