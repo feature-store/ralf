@@ -41,6 +41,7 @@ class SQLiteConnector(Connector):
             f"INSERT INTO {table_name} (key, record) VALUES ({record.key}, ?)"
         )
         if not historical:
+            # Look into a way to combine these two sql commands to reduce latency
             delete_statement = f"DELETE FROM {table_name} WHERE key = {record.key}"
             curr.execute(delete_statement)
         curr.execute(insert_statement, (jsonString,))
