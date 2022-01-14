@@ -5,18 +5,16 @@ from ralf.tables.connector import Connector
 
 
 class DictConnector(Connector):
-    # Ignores historical as a historical in-memory store is impossible
-
     def __init__(self):
         self.tables = dict()
 
-    def add_table(self, schema: Schema, historical: bool):
+    def add_table(self, schema: Schema):
         self.tables[schema.get_name()] = dict()
 
     def get_records(self, schema: Schema) -> Dict:
         return self.tables[schema.get_name()]
 
-    def update(self, schema: Schema, historical: bool, record: Record):
+    def update(self, schema: Schema, record: Record):
         records = self.get_records(schema)
         key = getattr(record, schema.primary_key)
         records[key] = record

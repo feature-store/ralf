@@ -6,11 +6,11 @@ from ralf.state import Record, Schema
 
 class Connector(ABC):
     @abstractmethod
-    def add_table(self, schema: Schema, historical: bool):
+    def add_table(self, schema: Schema):
         pass
 
     @abstractmethod
-    def update(self, schema: Schema, historical: bool, record: Record):
+    def update(self, schema: Schema, record: Record):
         pass
 
     @abstractmethod

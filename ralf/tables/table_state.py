@@ -7,11 +7,10 @@ from ralf.tables.connector import Connector
 # Maintains table values
 # TODO: This should eventually be a wrapper around a DB connection
 class TableState:
-    def __init__(self, schema: Schema, connector: Connector, historical: bool = False):
+    def __init__(self, schema: Schema, connector: Connector):
         self.schema = schema
         self.connector = connector
-        self.historical = historical
-        self.connector.add_table(schema, historical)
+        self.connector.add_table(schema)
 
         self.num_updates: int = 0
         self.num_deletes: int = 0
@@ -27,7 +26,7 @@ class TableState:
 
     def update(self, record: Record):
         self.schema.validate_record(record)
-        self.connector.update(self.schema, self.historical, record)
+        self.connector.update(self.schema, record)
         self.num_updates += 1
 
     def delete(self, key: str):
@@ -45,6 +44,3 @@ class TableState:
 
     def get_schema(self) -> Schema:
         return self.schema
-
-    def get_historical(self) -> bool:
-        return self.historical

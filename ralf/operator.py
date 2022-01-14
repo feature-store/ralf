@@ -128,11 +128,10 @@ class Operator(ABC):
         load_shedding_policy: Callable[
             [Record, Record], bool
         ] = load_shedding_policy.always_process,
-        historical: bool = False,
     ):
 
         # Mained output table state
-        self._table = TableState(schema, connector, historical)
+        self._table = TableState(schema, connector)
         self._cache_size = cache_size
         self._lru = OrderedDict()
         self._lazy = lazy

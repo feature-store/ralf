@@ -14,12 +14,11 @@ class Print(Operator):
         primary_key: str,
         primary_key_type: Type,
         connector: Connector,
-        historical: bool = False,
         cache_size=DEFAULT_STATE_CACHE_SIZE,
     ):
         # TODO: generate schema automatically from generics
         schema = Schema(primary_key, {primary_key: primary_key_type})
-        super().__init__(schema, connector, cache_size, historical)
+        super().__init__(schema, connector, cache_size)
 
     def on_record(self, record) -> Optional[Record]:
         print(record)

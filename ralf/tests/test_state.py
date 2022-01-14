@@ -4,7 +4,10 @@ import pytest
 import redis
 
 from ralf.state import Record, Schema
-from ralf.tables import DictConnector, RedisConnector, SQLiteConnector, TableState
+from ralf.tables.dict_connector import DictConnector
+from ralf.tables.redis_connector import RedisConnector
+from ralf.tables.sqlite_connector import SQLiteConnector
+from ralf.tables.table_state import TableState
 
 
 def test_record():
@@ -25,7 +28,7 @@ def test_schema():
 
 def test_table_state(connector):
     state = TableState(
-        Schema(primary_key="key", columns={"key": int, "a": str}), connector, False
+        Schema(primary_key="key", columns={"key": int, "a": str}), connector
     )
     # test update
     state.update(Record(key=1, a="a"))

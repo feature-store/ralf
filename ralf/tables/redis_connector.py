@@ -8,15 +8,13 @@ from ralf.tables.connector import Connector
 
 
 class RedisConnector(Connector):
-    # Not sure how historical would work with Redis so ignoring it for now
-
     def __init__(self, conn: redis.client.Redis):
         self.conn = conn
 
-    def add_table(self, schema: Schema, historical: bool):
+    def add_table(self, schema: Schema):
         pass
 
-    def update(self, schema: Schema, historical: bool, record: Record):
+    def update(self, schema: Schema, record: Record):
         key = getattr(record, schema.primary_key)
         pickled_record = pickle.dumps(record)
         self.conn.hset(schema.get_name(), key, pickled_record)
