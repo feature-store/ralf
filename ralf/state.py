@@ -26,20 +26,6 @@ class Record:
     # def __dict__(self):
     #    return self.entries
 
-    def sql_update_format(self) -> str:
-        query = []
-        for k, v in entries.items():
-            query.append("{k} = {v}")
-        query.append("processing_time = {self.processing_time}")
-        return ", ".join(query)
-
-    def sql_values(self) -> str:
-        query = []
-        for _, v in entries.items():
-            query.append(str(v))
-        query.append(str(self.processing_time))
-        return ", ".join(query)
-
 
 class Schema:
     def __init__(self, primary_key: str, columns: Dict[str, Type]):
