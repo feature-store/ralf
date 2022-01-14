@@ -1,6 +1,5 @@
 import json
 import time
-from json import JSONEncoder
 from string import ascii_lowercase
 from typing import Any, Dict, Type
 
@@ -40,13 +39,6 @@ class Record:
             query.append(str(v))
         query.append(str(self.processing_time))
         return ", ".join(query)
-
-
-class RecordEncoder(JSONEncoder):
-    def default(self, object):
-        if isinstance(object, Record):
-            return vars(object)
-        return JSONEncoder.default(self, object)
 
 
 class Schema:

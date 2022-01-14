@@ -1,4 +1,4 @@
-import json
+import pickle
 import sqlite3
 from typing import List, Union
 
@@ -36,7 +36,7 @@ class SQLiteConnector(Connector):
     def update(self, schema: Schema, historical: bool, record: Record):
         curr = self.conn.cursor()
         table_name = schema.get_name()
-        jsonString = json.dumps(vars(record))
+        pickled_record = pickle.dumps(record)
         insert_statement = (
             f"INSERT INTO {table_name} (key, record) VALUES ({record.key}, ?)"
         )
@@ -44,7 +44,7 @@ class SQLiteConnector(Connector):
             # Look into a way to combine these two sql commands to reduce latency
             delete_statement = f"DELETE FROM {table_name} WHERE key = {record.key}"
             curr.execute(delete_statement)
-        curr.execute(insert_statement, (jsonString,))
+        curr.execute(insert_statement, (pickled_record,))
         self.conn.commit()
 
     def delete(self, schema: Schema, key: str):
@@ -60,17 +60,17 @@ class SQLiteConnector(Connector):
         row = curr.execute(select_statement).fetchone()
         record = None
         if row:
-            record = Record(**json.loads(row[0]))
+            record = pickle.loads(row[0])
         return record
 
     def get_all(self, schema: Schema) -> List[Record]:
         curr = self.conn.cursor()
         table_name = schema.get_name()
         rows = curr.execute(f"SELECT record FROM {table_name}").fetchall()
-        records = [Record(**json.loads(i[0])) for i in rows]
+        records = [pickle.loads(i[0]) for i in rows]
         return records
 
-    def get_num_records(self, schema: Schema) -> int:
+    def count(self, schema: Schema) -> int:
         curr = self.conn.cursor()
         schema.get_name()
         count = curr.execute("SELECT COUNT(id) FROM {table_name}").fetch_one()

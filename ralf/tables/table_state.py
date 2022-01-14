@@ -18,7 +18,7 @@ class TableState:
         self.num_records: int = 0
 
     def debug_state(self):
-        self.num_records = self.connector.get_num_records()
+        self.num_records = self.connector.count()
         return {
             "num_updates": self.num_updates,
             "num_deletes": self.num_deletes,
