@@ -26,5 +26,5 @@ class Connector(ABC):
         pass
 
     @abstractmethod
-    def get_num_records(self, schema: Schema) -> int:
+    def count(self, schema: Schema) -> int:
         pass

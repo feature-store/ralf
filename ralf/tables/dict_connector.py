@@ -36,6 +36,6 @@ class DictConnector(Connector):
         records = self.get_records(schema)
         return list(records.values())
 
-    def get_num_records(self, schema: Schema) -> int:
+    def count(self, schema: Schema) -> int:
         records = self.get_records(schema)
         return len(records.items())

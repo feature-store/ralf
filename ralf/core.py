@@ -28,6 +28,7 @@ class Ralf:
         self.log_wandb = log_wandb
         if self.log_wandb:
             import wandb
+
             wandb.init(project="stl", entity="ucb-ralf", group=exp_id)
             wandb.run.name = exp_id
 

@@ -1,4 +1,4 @@
-import json
+import pickle
 from typing import List, Union
 
 import redis
@@ -18,8 +18,8 @@ class RedisConnector(Connector):
 
     def update(self, schema: Schema, historical: bool, record: Record):
         key = getattr(record, schema.primary_key)
-        jsonString = json.dumps(vars(record))
-        self.conn.hset(schema.get_name(), key, jsonString)
+        pickled_record = pickle.dumps(record)
+        self.conn.hset(schema.get_name(), key, pickled_record)
 
     def delete(self, schema: Schema, key: str):
         self.conn.hdel(schema.get_name(), key)
@@ -27,15 +27,14 @@ class RedisConnector(Connector):
     def get_one(self, schema: Schema, key) -> Union[Record, None]:
         val = self.conn.hget(schema.get_name(), key)
         if val:
-            record = val.decode("utf-8")
-            return Record(**json.loads(record))
+            return pickle.loads(val)
         return None
 
     def get_all(self, schema: Schema) -> List[Record]:
         values = self.conn.hvals(schema.get_name())
-        records = [Record(**json.loads(val.decode("utf-8"))) for val in values]
+        records = [pickle.loads(val) for val in values]
         return sorted(records, key=lambda r: r.processing_time)
 
-    def get_num_records(self, schema: Schema) -> int:
+    def count(self, schema: Schema) -> int:
         num_records = self.conn.hlen(schema.get_name())
         return num_records
