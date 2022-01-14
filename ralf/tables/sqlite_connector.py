@@ -70,5 +70,5 @@ class SQLiteConnector(Connector):
     def count(self, schema: Schema) -> int:
         curr = self.conn.cursor()
         schema.get_name()
-        count = curr.execute("SELECT COUNT(id) FROM {table_name}").fetch_one()
+        count = curr.execute(f"SELECT COUNT(id) FROM {table_name}").fetch_one()
         return count
