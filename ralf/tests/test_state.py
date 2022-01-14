@@ -17,6 +17,7 @@ def test_record():
     assert r.a == "a"
     assert r.b == "b"
 
+
 def test_schema():
     schema = Schema(primary_key="key", columns={"key": int, "a": str, "b": int})
 
@@ -24,12 +25,14 @@ def test_schema():
     with pytest.raises(AssertionError):
         schema.validate_record(Record(a="a"))
 
+
 dict_connector = DictConnector()
 sqlite_connector = SQLiteConnector(sqlite3.connect("test.db"))
 redis_connector = RedisConnector(redis.Redis())
 connectors = [dict_connector, sqlite_connector, redis_connector]
 
-@pytest.mark.parametrize('connector', connectors)
+
+@pytest.mark.parametrize("connector", connectors)
 def test_table_state(connector):
     state = TableState(
         Schema(primary_key="key", columns={"key": int, "a": str}), connector
@@ -62,3 +65,9 @@ def test_table_state(connector):
     assert state.bulk_query() == [
         Record(key=1, a="a"),
     ]
+
+    assert state.debug_state() == {
+        "num_updates": 3,
+        "num_deletes": 1,
+        "num_records": 1,
+    }

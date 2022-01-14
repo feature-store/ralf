@@ -10,8 +10,6 @@ sql_types = {int: "INTEGER", str: "TEXT", float: "REAL"}
 
 def schema_sql_format(schema: Schema) -> str:
     query = []
-    table_id = "id INT IDENTITY PRIMARY KEY"
-    query.append(table_id)
     primary_type = sql_types[schema.columns[schema.primary_key]]
     query.append(f"{schema.primary_key} {primary_type}")
     query.append("record TEXT")
@@ -53,7 +51,7 @@ class SQLiteConnector(Connector):
     def get_one(self, schema: Schema, key: str) -> Union[Record, None]:
         curr = self.conn.cursor()
         table_name = schema.get_name()
-        select_statement = f"SELECT record FROM {table_name} WHERE {schema.primary_key} = {key} ORDER BY id DESC"
+        select_statement = f"SELECT record FROM {table_name} WHERE {schema.primary_key} = {key} ORDER BY rowid DESC"
         row = curr.execute(select_statement).fetchone()
         record = None
         if row:
@@ -69,6 +67,6 @@ class SQLiteConnector(Connector):
 
     def count(self, schema: Schema) -> int:
         curr = self.conn.cursor()
-        schema.get_name()
-        count = curr.execute(f"SELECT COUNT(id) FROM {table_name}").fetch_one()
+        table_name = schema.get_name()
+        count = curr.execute(f"SELECT COUNT(rowid) FROM {table_name}").fetchone()[0]
         return count
