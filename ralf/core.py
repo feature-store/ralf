@@ -16,7 +16,7 @@ class Ralf:
         metric_dir: Optional[str] = None,
     ):
         if not ray.is_initialized():
-            ray.init(log_to_driver=False)
+            ray.init(log_to_driver=True)
         self.tables = {}
 
         self.metric_dir = self._make_metric_dir(metric_dir)
