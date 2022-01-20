@@ -27,7 +27,8 @@ class Source(Operator, ABC):
             except Exception as e:
                 if not isinstance(e, StopIteration):
                     traceback.print_exc()
-                return
+                print("error", e)
+                #return
             # TODO(peter): optimize by adding batch send.
             for record in records:
                 self.send(record)
