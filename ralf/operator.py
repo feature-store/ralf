@@ -6,8 +6,6 @@ from abc import ABC, abstractmethod
 from collections import OrderedDict, defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from queue import PriorityQueue
-from ralf.queue import SingleQueue, KeyQueue
-
 from typing import Callable, List, Optional
 
 import psutil
@@ -15,6 +13,7 @@ import ray
 from ray.actor import ActorHandle
 
 from ralf.policies import load_shedding_policy, processing_policy
+from ralf.queue import KeyQueue, SingleQueue
 from ralf.state import Record, Schema, TableState
 
 DEFAULT_STATE_CACHE_SIZE: int = 0
@@ -98,25 +97,42 @@ class Event:
 
 
 class Operator(ABC):
+
     """Abstract Operator class.
 
     Transforms data from parent tables and stores results in an output table.
     Operators can compute lazily or eagerly, and manage queries to the output table.
     Computation can be multithreaded, as well as sharded by key across multiple
-        processes.
+    processes.
 
-    Args:
-        schema: schema of the output table.
-        cache_size: number of records stored in memory for the output table.
-        lazy: whether records are produced lazily (on request) or eagerly.
-        num_worker_threads: number of concurrent threads with which recrods are
-            produced.
-        procesing_policy: a function that returns true if the first record should be
-            processed before the second. By default, processes records in order of
-            processing time.
-        load_shedding_policy: decides whether to process the candidate record given that
-            the current record is already present in the output table.
+
+    :param [ParamName]: [ParamDescription], defaults to [DefaultParamVal]
+    :type [ParamName]: [ParamType](, optional)
+    :raises [ErrorType]: [ErrorDescription]
+    :return: [ReturnDescription]
+    :rtype: [ReturnType]
+
     """
+
+    #"""Abstract Operator class.
+
+    #Transforms data from parent tables and stores results in an output table.
+    #Operators can compute lazily or eagerly, and manage queries to the output table.
+    #Computation can be multithreaded, as well as sharded by key across multiple
+    #    processes.
+
+    #Args:
+    #    schema: schema of the output table.
+    #    cache_size: number of records stored in memory for the output table.
+    #    lazy: whether records are produced lazily (on request) or eagerly.
+    #    num_worker_threads: number of concurrent threads with which recrods are
+    #        produced.
+    #    procesing_policy: a function that returns true if the first record should be
+    #        processed before the second. By default, processes records in order of
+    #        processing time.
+    #    load_shedding_policy: decides whether to process the candidate record given that
+    #        the current record is already present in the output table.
+    #"""
 
     def __init__(
         self,
