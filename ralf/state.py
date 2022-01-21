@@ -1,5 +1,7 @@
+import json
 import time
-from typing import Any, Dict, List, Type
+from string import ascii_lowercase
+from typing import Any, Dict, Type
 
 
 class Record:
@@ -29,6 +31,7 @@ class Schema:
     def __init__(self, primary_key: str, columns: Dict[str, Type]):
         self.primary_key = primary_key
         self.columns = columns
+        self.name = self.compute_name()
 
     def validate_record(self, record: Record):
         # TODO: add type checking.
@@ -38,43 +41,16 @@ class Schema:
             schema_columns == record_columns
         ), f"schema columns are {schema_columns} but record has {record_columns}"
 
+    def compute_name(self) -> str:
+        dump = json.dumps(list(self.columns.keys()), sort_keys=True)
+        hash_val = str(abs(hash(dump)))
+        name = ""
+        for c in hash_val:
+            name += ascii_lowercase[int(c)]
+        return name
 
-# Maintains table values
-# TODO: This should eventually be a wrapper around a DB connection
-class TableState:
-    def __init__(self, schema: Schema):
-        self.schema = schema
-        self.records = {}
+    def get_name(self) -> str:
+        return self.name
 
-        self.num_updates: int = 0
-        self.num_deletes: int = 0
-        self.num_records: int = 0
-
-    def debug_state(self):
-        return {
-            "num_updates": self.num_updates,
-            "num_deletes": self.num_deletes,
-            "num_records": self.num_records,
-        }
-
-    def update(self, record: Record):
-        key = getattr(record, self.schema.primary_key)
-        self.records[key] = record
-
-        self.num_updates += 1
-        self.num_records = len(self.records)
-
-    def delete(self, key: str):
-        self.records.pop(key, None)
-        self.num_deletes += 1
-
-    def get_schema(self) -> Schema:
-        return self.schema
-
-    def point_query(self, key) -> Record:
-        if key not in self.records:
-            raise KeyError(f"Key {key} not found.")
-        return self.records[key]
-
-    def bulk_query(self) -> List[Record]:
-        return list(self.records.values())
+    def __hash__(self) -> int:
+        return hash(self.name)
