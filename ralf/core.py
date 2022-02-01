@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 import json
 import os
 import time
@@ -8,6 +9,14 @@ from typing import Optional, Set
 import ray
 
 from ralf.table import Table, deploy_queryable_server
+
+
+@dataclass
+class RalfContext:
+    metrics_dir: str
+
+    current_shard_idx: int = -1
+    current_actor_handle = None
 
 
 class Ralf:
@@ -64,28 +73,7 @@ class Ralf:
             del value["actors_state_ref"]
         return view
 
-    def snapshot(self):
-        "Perform a snapshot of the system state and write to disk."
-        snapshot_start = time.time()
-        data = self.pipeline_view()
-        snapshot_duration = time.time() - snapshot_start
-        serialized = json.dumps(
-            dict(
-                snapshot_start=snapshot_start,
-                snapshot_duration=snapshot_duration,
-                data=data,
-            )
-        )
-
-        self.metric_file.write(serialized)
-        self.metric_file.write("\n")
-        self.metric_file.flush()
-        return snapshot_duration
-
     def run(self):
-        if any(table.is_queryable for table in self._visit_all_tables()):
-            deploy_queryable_server()
-
         # pull data from sources
         for table in self.tables.values():
             if table.is_source():

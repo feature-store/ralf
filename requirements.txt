@@ -8,3 +8,4 @@ redis
 sympy
 numpy
 pandas
+git+https://github.com/simon-mo/event_metrics@v0.1
