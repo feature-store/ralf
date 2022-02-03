@@ -1,9 +1,13 @@
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from collections import deque
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+import logging
 from optparse import Option
+import queue
+from threading import Thread
+import threading
 from graphlib import TopologicalSorter
-from typing import Deque, Dict, Iterable, List, Optional, Union
+from typing import Any, Deque, Dict, Iterable, List, Optional, Union
 
 
 # class Record:
@@ -40,32 +44,98 @@ class FeatureFrame:
         return f"FeatureFrame({self.transform_object})"
 
 
+class BaseScheduler(ABC):
+    """Base class for scheduling event on to transform operator"""
+
+    @abstractmethod
+    def push_event(self, record: Record):
+        pass
+
+    @abstractmethod
+    def pop_event(self) -> Union[Record, threading.Event]:
+        pass
+
+
+class FIFO(BaseScheduler):
+    def __init__(self) -> None:
+        self.queue: List[Record] = []
+        self.waker: Optional[threading.Event] = None
+
+    def push_event(self, record: Record):
+        if self.waker is not None:
+            self.waker.set()
+            self.waker = None
+        return self.queue.append(record)
+
+    def pop_event(self) -> Union[Record, threading.Event]:
+        if len(self.queue) == 0:
+            assert self.waker is None
+            self.waker = threading.Event()
+            return self.waker
+        return self.queue.pop(0)
+
+
+class InfiniteNoopEvent(BaseScheduler):
+    def push_event(self, record: Record):
+        pass
+
+    def pop_event(self) -> Union[Record, threading.Event]:
+        return Record()
+
+
 class RalfOperator:
     pass
 
 
 class LocalOperator(RalfOperator):
-    def __init__(self, frame: FeatureFrame, childrens: List["RalfOperator"]):
+    def __init__(
+        self,
+        frame: FeatureFrame,
+        childrens: List["RalfOperator"],
+        scheduler: BaseScheduler,
+    ):
         self.frame = frame
         self.transform_object = self.frame.transform_object
         self.childrens = childrens
+        self.scheduler = scheduler
 
-    def poll(self, record: Record):
+        self.worker_thread = Thread(target=self.run_forever, daemon=True)
+        self.worker_thread.start()
+
+    def run_forever(self):
         while True:
-            try:
-                self.handle_event(record)
-            except StopIteration:
-                print("StopIteration")
+            # TODO(simon): consider caching event so we don't need to block on pop
+            next_event = self.scheduler.pop_event()
+            if isinstance(next_event, threading.Event):
+                next_event.wait()
+                next_event = self.scheduler.pop_event()
+                # print(next_event)
+                # assert isinstance(next_event, Record)
+            if isinstance(next_event, StopIteration):
                 break
+            try:
+                self.handle_event(next_event)
+            except StopIteration:
+                for children in self.childrens:
+                    children.enqueue_event(StopIteration())
+                break
+            except Exception:
+                logging.exception("error in handling event")
+        print("thread exit")
 
     def handle_event(self, record: Record):
         # exception handling
         out = self.transform_object.on_event(record)
         if isinstance(out, Record):
             for children in self.childrens:
-                children.handle_event(out)
-        else:  # handle iterables
+                children.enqueue_event(out)
+        else:  # handle iterables, and None
             pass
+
+    def enqueue_event(
+        self, record: Union[Record, StopIteration]
+    ):  # TODO(simon): wrap this union type into a data class
+        self.scheduler.push_event(record)
 
 
 @dataclass
@@ -77,7 +147,7 @@ class RalfApplication:
     def __init__(self, config: RalfConfig):
         self.config = config
         self.source_frame: Optional[FeatureFrame] = None
-        self.source_operator: Option[RalfOperator] = None
+        self.operators: Dict[FeatureFrame, RalfOperator] = dict()
 
     def source(self, transform_object: BaseTransform) -> FeatureFrame:
         if self.source_frame is not None:
@@ -99,19 +169,21 @@ class RalfApplication:
     def deploy(self):
         graph = self._walk_full_graph()
         sorted_order = list(TopologicalSorter(graph).static_order())
-        operators = dict()
         for frame in sorted_order:
-            print(f"Deploying {frame}")
+            is_source = frame is self.source_frame
             operator = LocalOperator(
-                frame, childrens=[operators[f] for f in graph[frame]]
+                frame,
+                childrens=[self.operators[f] for f in graph[frame]],
+                scheduler=InfiniteNoopEvent() if is_source else FIFO(),
             )
-            operators[frame] = operator
-            if frame is self.source_frame:
-                self.source_operator = operator
+            self.operators[frame] = operator
 
     def run(self):
         self.deploy()
-        self.source_operator.poll(0)
+
+        # Make the join condition configurable and agnostic to operator implementation
+        for operator in self.operators.values():
+            operator.worker_thread.join()
 
 
 if __name__ == "__main__":
