@@ -6,6 +6,7 @@ from optparse import Option
 import queue
 from threading import Thread
 import threading
+import time
 from graphlib import TopologicalSorter
 from typing import Any, Deque, Dict, Iterable, List, Optional, Union
 
@@ -47,6 +48,16 @@ class FeatureFrame:
 class BaseScheduler(ABC):
     """Base class for scheduling event on to transform operator"""
 
+    def wake_waiter_if_needed(self):
+        if self.waker is not None:
+            self.waker.set()
+            self.waker = None
+
+    def new_waker(self):
+        assert self.waker is None
+        self.waker = threading.Event()
+        return self.waker
+
     @abstractmethod
     def push_event(self, record: Record):
         pass
@@ -62,25 +73,44 @@ class FIFO(BaseScheduler):
         self.waker: Optional[threading.Event] = None
 
     def push_event(self, record: Record):
-        if self.waker is not None:
-            self.waker.set()
-            self.waker = None
-        return self.queue.append(record)
+        self.wake_waiter_if_needed()
+        self.queue.append(record)
 
     def pop_event(self) -> Union[Record, threading.Event]:
         if len(self.queue) == 0:
-            assert self.waker is None
-            self.waker = threading.Event()
-            return self.waker
+            return self.new_waker()
         return self.queue.pop(0)
 
 
-class InfiniteNoopEvent(BaseScheduler):
+class LIFO(BaseScheduler):
+    def __init__(self) -> None:
+        self.queue: List[Record] = []
+        self.waker: Optional[threading.Event] = None
+
+    def push_event(self, record: Record):
+        self.wake_waiter_if_needed()
+        if isinstance(record, StopIteration):
+            self.queue.insert(0, record)
+        else:
+            self.queue.append(record)
+
+    def pop_event(self) -> Union[Record, threading.Event]:
+        if len(self.queue) == 0:
+            return self.new_waker()
+        return self.queue.pop(-1)
+
+
+class SourceScheduler(BaseScheduler):
     def push_event(self, record: Record):
         pass
 
     def pop_event(self) -> Union[Record, threading.Event]:
         return Record()
+
+
+# TODO(simon)
+# implement multi-pass scheduler abstraction
+# implement caching schduler
 
 
 class RalfOperator:
@@ -138,6 +168,11 @@ class LocalOperator(RalfOperator):
         self.scheduler.push_event(record)
 
 
+class RayOperator(LocalOperator):
+    def enqueue_event(self, record: Union[Record, StopIteration]):
+        return super().enqueue_event(record)
+
+
 @dataclass
 class RalfConfig:
     metrics_dir: Optional[str] = None
@@ -174,7 +209,7 @@ class RalfApplication:
             operator = LocalOperator(
                 frame,
                 childrens=[self.operators[f] for f in graph[frame]],
-                scheduler=InfiniteNoopEvent() if is_source else FIFO(),
+                scheduler=SourceScheduler() if is_source else FIFO(),  # FIFO(),
             )
             self.operators[frame] = operator
 
@@ -207,6 +242,7 @@ if __name__ == "__main__":
         def on_event(self, record: Record) -> Union[None, Record, Iterable[Record]]:
             self.state += record
             print(self.state)
+            time.sleep(0.2)
             return None
 
     sink = app.source(CounterSource(10)).transform(Sum())
