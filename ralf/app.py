@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from collections import deque
 from dataclasses import dataclass, field
+import enum
 import logging
 from optparse import Option
 import queue
@@ -8,7 +9,7 @@ from threading import Thread
 import threading
 import time
 from graphlib import TopologicalSorter
-from typing import Any, Deque, Dict, Iterable, List, Optional, Union
+from typing import Any, Deque, Dict, Iterable, List, Optional, Type, Union
 
 
 # class Record:
@@ -17,32 +18,25 @@ from typing import Any, Deque, Dict, Iterable, List, Optional, Union
 Record = int
 
 
-class BaseTransform:
-    @abstractmethod
-    def on_event(self, record: Record) -> Union[None, Record, Iterable[Record]]:
-        """Emit none, one, or multiple events given incoming record.
+@dataclass
+class RalfConfig:
+    metrics_dir: Optional[str] = None
+    deploy_mode: str = "local"
 
-        When StopIteration exception is raised, the transform process will terminate.
-        A StopIteration special record will also propogate to downstream feature frames.
+    def __post_init__(self):
+        self.deploy_mode = self.deploy_mode.lower()
+        assert self.deploy_mode in {
+            "local",
+            "ray",
+            # "simpy",
+        }
 
-        Source operator should expect this method to be called continously unless it raises
-        StopIteration.
-        """
-        raise NotImplementedError("To be implemented by subclass.")
-
-
-class FeatureFrame:
-    def __init__(self, transform_object: BaseTransform):
-        self.transform_object = transform_object
-        self.children: List["FeatureFrame"] = []
-
-    def transform(self, transform_object: BaseTransform) -> "FeatureFrame":
-        frame = FeatureFrame(transform_object)
-        self.children.append(frame)
-        return frame
-
-    def __repr__(self) -> str:
-        return f"FeatureFrame({self.transform_object})"
+    def get_manager_cls(self) -> Type["RalfManager"]:
+        if self.deploy_mode == "local":
+            return LocalManager
+        elif self.deploy_mode == "ray":
+            pass
+            # return RayManager
 
 
 class BaseScheduler(ABC):
@@ -108,9 +102,37 @@ class SourceScheduler(BaseScheduler):
         return Record()
 
 
-# TODO(simon)
-# implement multi-pass scheduler abstraction
-# implement caching schduler
+class BaseTransform:
+    @abstractmethod
+    def on_event(self, record: Record) -> Union[None, Record, Iterable[Record]]:
+        """Emit none, one, or multiple events given incoming record.
+
+        When StopIteration exception is raised, the transform process will terminate.
+        A StopIteration special record will also propogate to downstream feature frames.
+
+        Source operator should expect this method to be called continously unless it raises
+        StopIteration.
+        """
+        raise NotImplementedError("To be implemented by subclass.")
+
+
+class FeatureFrame:
+    def __init__(
+        self, transform_object: BaseTransform, scheduler: BaseScheduler = FIFO()
+    ):
+        self.transform_object = transform_object
+        self.scheduler = scheduler
+        self.children: List["FeatureFrame"] = []
+
+    def transform(
+        self, transform_object: BaseTransform, scheduler: BaseScheduler = FIFO()
+    ) -> "FeatureFrame":
+        frame = FeatureFrame(transform_object, scheduler)
+        self.children.append(frame)
+        return frame
+
+    def __repr__(self) -> str:
+        return f"FeatureFrame({self.transform_object})"
 
 
 class RalfOperator:
@@ -122,12 +144,11 @@ class LocalOperator(RalfOperator):
         self,
         frame: FeatureFrame,
         childrens: List["RalfOperator"],
-        scheduler: BaseScheduler,
     ):
         self.frame = frame
         self.transform_object = self.frame.transform_object
         self.childrens = childrens
-        self.scheduler = scheduler
+        self.scheduler = frame.scheduler
 
         self.worker_thread = Thread(target=self.run_forever, daemon=True)
         self.worker_thread.start()
@@ -157,8 +178,7 @@ class LocalOperator(RalfOperator):
         # exception handling
         out = self.transform_object.on_event(record)
         if isinstance(out, Record):
-            for children in self.childrens:
-                children.enqueue_event(out)
+            self.broadcast_children(out)
         else:  # handle iterables, and None
             pass
 
@@ -167,27 +187,63 @@ class LocalOperator(RalfOperator):
     ):  # TODO(simon): wrap this union type into a data class
         self.scheduler.push_event(record)
 
+    def broadcast_children(self, record):
+        for children in self.childrens:
+            children.enqueue_event(record)
+
 
 class RayOperator(LocalOperator):
-    def enqueue_event(self, record: Union[Record, StopIteration]):
-        return super().enqueue_event(record)
+    def broadcast_children(self, record):
+        for children in self.childrens:
+            children.enqueue_event.remote(record)
 
 
-@dataclass
-class RalfConfig:
-    metrics_dir: Optional[str] = None
+class RalfManager(ABC):
+    @abstractmethod
+    def __init__(self):
+        pass
+
+    @abstractmethod
+    def deploy(self):
+        pass
+
+    @abstractmethod
+    def wait(self):
+        pass
+
+
+class LocalManager(RalfManager):
+    operator_cls = LocalOperator
+
+    def __init__(self) -> None:
+        self.operators: Dict[FeatureFrame, RalfOperator] = dict()
+
+    def deploy(self, graph: Dict[FeatureFrame, List[FeatureFrame]]):
+        sorted_order: List[FeatureFrame] = list(TopologicalSorter(graph).static_order())
+        for frame in sorted_order:
+            operator = LocalOperator(
+                frame,
+                childrens=[self.operators[f] for f in graph[frame]],
+            )
+            self.operators[frame] = operator
+
+    def wait(self):
+        # Make the join condition configurable and agnostic to operator implementation
+        for operator in self.operators.values():
+            operator.worker_thread.join()
 
 
 class RalfApplication:
     def __init__(self, config: RalfConfig):
         self.config = config
+        self.manager: RalfManager = self.config.get_manager_cls()()
+        # used by walking graph for deploy
         self.source_frame: Optional[FeatureFrame] = None
-        self.operators: Dict[FeatureFrame, RalfOperator] = dict()
 
     def source(self, transform_object: BaseTransform) -> FeatureFrame:
         if self.source_frame is not None:
             raise NotImplementedError("Multiple source is not supported.")
-        self.source_frame = FeatureFrame(transform_object)
+        self.source_frame = FeatureFrame(transform_object, SourceScheduler())
         return self.source_frame
 
     def _walk_full_graph(self) -> Dict[FeatureFrame, List[FeatureFrame]]:
@@ -203,26 +259,14 @@ class RalfApplication:
 
     def deploy(self):
         graph = self._walk_full_graph()
-        sorted_order = list(TopologicalSorter(graph).static_order())
-        for frame in sorted_order:
-            is_source = frame is self.source_frame
-            operator = LocalOperator(
-                frame,
-                childrens=[self.operators[f] for f in graph[frame]],
-                scheduler=SourceScheduler() if is_source else FIFO(),  # FIFO(),
-            )
-            self.operators[frame] = operator
+        self.manager.deploy(graph)
 
-    def run(self):
-        self.deploy()
-
-        # Make the join condition configurable and agnostic to operator implementation
-        for operator in self.operators.values():
-            operator.worker_thread.join()
+    def wait(self):
+        self.manager.wait()
 
 
 if __name__ == "__main__":
-    app = RalfApplication(RalfConfig())
+    app = RalfApplication(RalfConfig(deploy_mode="local"))
 
     class CounterSource(BaseTransform):
         def __init__(self, up_to: int) -> None:
@@ -245,5 +289,6 @@ if __name__ == "__main__":
             time.sleep(0.2)
             return None
 
-    sink = app.source(CounterSource(10)).transform(Sum())
-    app.run()
+    sink = app.source(CounterSource(10)).transform(Sum(), LIFO())
+    app.deploy()
+    app.wait()
