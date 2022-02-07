@@ -1,21 +1,35 @@
-from abc import ABC, abstractmethod
-from collections import deque
-from dataclasses import dataclass, field
 import enum
+import hashlib
 import logging
-from optparse import Option
 import queue
-from threading import Thread
 import threading
 import time
+from abc import ABC, abstractmethod
+from collections import deque
+from copy import copy
+from dataclasses import dataclass, field
 from graphlib import TopologicalSorter
-from typing import Any, Deque, Dict, Iterable, List, Optional, Type, Union
+from optparse import Option
+from threading import Thread
+from typing import Any, Deque, Dict, Iterable, List, Optional, Tuple, Type, Union
 
+import ray
+from ray.actor import ActorHandle
 
 # class Record:
 #     pass
 
-Record = int
+
+@dataclass
+class Record:
+    # Tagged union
+    type_: str
+
+    # data type
+    entries: int = 0
+
+    # error type
+    error: Exception = StopIteration()
 
 
 @dataclass
@@ -35,8 +49,7 @@ class RalfConfig:
         if self.deploy_mode == "local":
             return LocalManager
         elif self.deploy_mode == "ray":
-            pass
-            # return RayManager
+            return RayManager
 
 
 class BaseScheduler(ABC):
@@ -83,7 +96,7 @@ class LIFO(BaseScheduler):
 
     def push_event(self, record: Record):
         self.wake_waiter_if_needed()
-        if isinstance(record, StopIteration):
+        if record.type_ == "error":
             self.queue.insert(0, record)
         else:
             self.queue.append(record)
@@ -99,7 +112,7 @@ class SourceScheduler(BaseScheduler):
         pass
 
     def pop_event(self) -> Union[Record, threading.Event]:
-        return Record()
+        return Record("entry")
 
 
 class BaseTransform:
@@ -135,8 +148,18 @@ class FeatureFrame:
         return f"FeatureFrame({self.transform_object})"
 
 
-class RalfOperator:
-    pass
+class RalfOperator(ABC):
+    @abstractmethod
+    def __init__(
+        self,
+        frame: FeatureFrame,
+        childrens: List["RalfOperator"],
+    ):
+        pass
+
+    @abstractmethod
+    def enqueue_event(self, record: Record):
+        pass
 
 
 class LocalOperator(RalfOperator):
@@ -150,10 +173,10 @@ class LocalOperator(RalfOperator):
         self.childrens = childrens
         self.scheduler = frame.scheduler
 
-        self.worker_thread = Thread(target=self.run_forever, daemon=True)
+        self.worker_thread = Thread(target=self._run_forever, daemon=True)
         self.worker_thread.start()
 
-    def run_forever(self):
+    def _run_forever(self):
         while True:
             # TODO(simon): consider caching event so we don't need to block on pop
             next_event = self.scheduler.pop_event()
@@ -161,41 +184,96 @@ class LocalOperator(RalfOperator):
                 next_event.wait()
                 next_event = self.scheduler.pop_event()
                 # print(next_event)
-                # assert isinstance(next_event, Record)
-            if isinstance(next_event, StopIteration):
+                assert isinstance(next_event, Record)
+            if next_event.type_ == "error":
                 break
             try:
-                self.handle_event(next_event)
+                self._handle_event(next_event)
             except StopIteration:
                 for children in self.childrens:
-                    children.enqueue_event(StopIteration())
+                    children.enqueue_event(Record("error"))
                 break
             except Exception:
                 logging.exception("error in handling event")
         print("thread exit")
 
-    def handle_event(self, record: Record):
+    def _handle_event(self, record: Record):
         # exception handling
         out = self.transform_object.on_event(record)
-        if isinstance(out, Record):
-            self.broadcast_children(out)
-        else:  # handle iterables, and None
-            pass
+        # TODO(simon): handle other out type like None or Iterables.
+        for children in self.childrens:
+            children.enqueue_event(Record("entry", entries=out))
 
-    def enqueue_event(
-        self, record: Union[Record, StopIteration]
-    ):  # TODO(simon): wrap this union type into a data class
+    def enqueue_event(self, record: Record):
+        self.handle_event(record)
+
+    def handle_event(self, record: Record):
         self.scheduler.push_event(record)
 
-    def broadcast_children(self, record):
-        for children in self.childrens:
-            children.enqueue_event(record)
+
+@dataclass
+class RalfContext:
+    current_shard_idx: int = -1
 
 
-class RayOperator(LocalOperator):
-    def broadcast_children(self, record):
-        for children in self.childrens:
-            children.enqueue_event.remote(record)
+class OperatorActorPool:
+    """Contains a set number of Ray Actors."""
+
+    def __init__(self, handles: List[ActorHandle]):
+        self.handles = handles
+
+    @classmethod
+    def make_replicas(
+        cls: Type["OperatorActorPool"],
+        num_replicas: int,
+        actor_class: Type,
+        ralf_context: RalfContext,
+        actor_options: Dict[str, Any] = dict(),
+        init_args: Tuple[Any] = tuple(),
+        init_kwargs: Dict[str, Any] = dict(),
+    ):
+        assert num_replicas > 0
+
+        handles = []
+        for i in range(num_replicas):
+            ralf_context = copy(ralf_context)
+            ralf_context.current_shard_idx = i
+
+            handle = actor_class.options(**actor_options).remote(
+                *init_args, **init_kwargs
+            )
+            handles.append(handle)
+
+        return cls(handles)
+
+    def hash_key(self, key: str) -> int:
+        assert isinstance(key, str)
+        hash_val = hashlib.sha1(key.encode("utf-8")).hexdigest()
+        return int(hash_val, 16)
+
+    def choose_actor(self, key: str) -> ActorHandle:
+        return self.handles[self.hash_key(key) % len(self.handles)]
+
+    # def broadcast(self, attr, *args):
+    #     # TODO: fix having to wait
+    #     outputs = []
+    #     for handle in self.handles:
+    #         outputs.append(getattr(handle, attr).remote(*args))
+    #     return outputs
+
+
+class RayOperator(RalfOperator):
+    def __init__(self, frame: FeatureFrame, childrens: List["RalfOperator"]):
+        self.pool = OperatorActorPool.make_replicas(
+            num_replicas=1,
+            actor_class=ray.remote(LocalOperator),
+            ralf_context=RalfContext(),
+            init_kwargs={"frame": frame, "childrens": childrens},
+        )
+        self.children = childrens
+
+    def enqueue_event(self, record: Record):
+        self.pool.choose_actor(repr(record)).handle_event.remote(record)
 
 
 class RalfManager(ABC):
@@ -204,7 +282,7 @@ class RalfManager(ABC):
         pass
 
     @abstractmethod
-    def deploy(self):
+    def deploy(self, graph: Dict[FeatureFrame, List[FeatureFrame]]):
         pass
 
     @abstractmethod
@@ -212,7 +290,30 @@ class RalfManager(ABC):
         pass
 
 
+class RayManager(ABC):
+    def __init__(self):
+        if not ray.is_initialized():
+            ray.init()
+        self.operators: Dict[FeatureFrame, RalfOperator] = dict()
+
+    def deploy(self, graph: Dict[FeatureFrame, List[FeatureFrame]]):
+        sorted_order: List[FeatureFrame] = list(TopologicalSorter(graph).static_order())
+        for frame in sorted_order:
+            operator = RayOperator(
+                frame,
+                childrens=[self.operators[f] for f in graph[frame]],
+            )
+            self.operators[frame] = operator
+
+    def wait(self):
+        # TODO(simon): implement signal waiting for actors.
+        # TODO(simon): might require local operators to aware of the exit callback?
+        while True:
+            time.sleep(5)
+
+
 class LocalManager(RalfManager):
+    # TODO(simon): looks like we can just merge all Manager subclass via parameterizing this?
     operator_cls = LocalOperator
 
     def __init__(self) -> None:
@@ -266,7 +367,7 @@ class RalfApplication:
 
 
 if __name__ == "__main__":
-    app = RalfApplication(RalfConfig(deploy_mode="local"))
+    app = RalfApplication(RalfConfig(deploy_mode="ray"))
 
     class CounterSource(BaseTransform):
         def __init__(self, up_to: int) -> None:
@@ -284,7 +385,7 @@ if __name__ == "__main__":
             self.state = 0
 
         def on_event(self, record: Record) -> Union[None, Record, Iterable[Record]]:
-            self.state += record
+            self.state += record.entries
             print(self.state)
             time.sleep(0.2)
             return None
