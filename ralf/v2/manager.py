@@ -4,7 +4,13 @@ from typing import TYPE_CHECKING, Dict, List, Type
 
 import ray
 
-from ralf.v2.operator import LocalOperator, RalfOperator, RayOperator
+from ralf.v2.operator import (
+    LocalOperator,
+    RalfOperator,
+    RayOperator,
+    SimpyOperator,
+    SimpySink,
+)
 
 if TYPE_CHECKING:
     from ralf.v2.api import FeatureFrame
@@ -28,7 +34,7 @@ class RalfManager(ABC):
         for frame in sorted_order:
             operator = self.operator_cls(
                 frame,
-                childrens=[self.operators[f] for f in graph[frame]],
+                children=[self.operators[f] for f in graph[frame]],
             )
             self.operators[frame] = operator
 
@@ -61,3 +67,22 @@ class RayManager(RalfManager):
         for operator in self.operators.values():
             for handle in operator.pool.handles:
                 ray.wait([handle.wait_for_exit.remote()], num_returns=1)
+
+
+class SimpyManager(RalfManager):
+    """Run schedulers in Simpy environment, skip transforms"""
+
+    operator_cls: Type[RalfOperator] = SimpyOperator
+
+    def __init__(self):
+        super().__init__()
+
+    def deploy(self, graph: Dict["FeatureFrame", List["FeatureFrame"]]):
+        super().deploy(graph)
+
+        self.sink = SimpySink()
+        for operator in self.operators.values():
+            operator.children.append(self.sink)
+
+    def wait(self):
+        return self.sink.dump_transform_state()

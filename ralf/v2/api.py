@@ -5,7 +5,7 @@ from typing import Deque, Dict, Iterable, List, Optional, Type, Union
 
 from typing_extensions import Literal
 
-from ralf.v2.manager import LocalManager, RalfManager, RayManager
+from ralf.v2.manager import LocalManager, RalfManager, RayManager, SimpyManager
 from ralf.v2.operator import OperatorConfig
 from ralf.v2.record import Record
 from ralf.v2.scheduler import FIFO, BaseScheduler, SourceScheduler
@@ -13,7 +13,7 @@ from ralf.v2.scheduler import FIFO, BaseScheduler, SourceScheduler
 SUPPORTED_DEPLOY_MODES = {
     "local": LocalManager,
     "ray": RayManager,
-    "simpy": RalfManager,
+    "simpy": SimpyManager,
 }
 
 
@@ -85,11 +85,17 @@ class RalfApplication:
         # used by walking graph for deploy
         self.source_frame: Optional[FeatureFrame] = None
 
-    def source(self, transform_object: BaseTransform) -> FeatureFrame:
+    def source(
+        self,
+        transform_object: BaseTransform,
+        operator_config: OperatorConfig = OperatorConfig(),
+    ) -> FeatureFrame:
         """Create a source feature frame with source transformation."""
         if self.source_frame is not None:
             raise NotImplementedError("Multiple source is not supported.")
-        self.source_frame = FeatureFrame(transform_object, SourceScheduler())
+        self.source_frame = FeatureFrame(
+            transform_object, SourceScheduler(), operator_config=operator_config
+        )
         return self.source_frame
 
     def _walk_full_graph(self) -> Dict[FeatureFrame, List[FeatureFrame]]:
@@ -110,4 +116,4 @@ class RalfApplication:
 
     def wait(self):
         """Wait for the data processing to finish."""
-        self.manager.wait()
+        return self.manager.wait()

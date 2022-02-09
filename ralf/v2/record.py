@@ -52,7 +52,9 @@ class Record(Generic[T]):
         return isinstance(self.entries, StopIteration)
 
     def is_wait_event(self) -> bool:
-        return isinstance(self.entries, threading.Event)
+        from ralf.v2.scheduler import WakerProtocol
+
+        return isinstance(self.entries, WakerProtocol)
 
     def wait(self):
         assert self.is_wait_event()

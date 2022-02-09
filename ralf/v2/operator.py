@@ -8,9 +8,11 @@ from threading import Thread
 from typing import TYPE_CHECKING, Any, Dict, List, Tuple, Type
 
 import ray
+import simpy
 from ray.actor import ActorHandle
 
 from ralf.v2.record import Record
+from ralf.v2.scheduler import DummyEntry, WakerProtocol
 
 if TYPE_CHECKING:
     from ralf.v2.api import BaseTransform, FeatureFrame
@@ -23,7 +25,7 @@ class RalfOperator(ABC):
     def __init__(
         self,
         frame: "FeatureFrame",
-        childrens: List["RalfOperator"],
+        children: List["RalfOperator"],
     ):
         pass
 
@@ -34,6 +36,11 @@ class RalfOperator(ABC):
     def dump_transform_state(self) -> List["BaseTransform"]:
         pass
 
+    def _send_to_children(self, records: List[Record]):
+        for record in records:
+            for children in self.children:
+                children.enqueue_event(record)
+
 
 class LocalOperator(RalfOperator):
     """Run a transform locally."""
@@ -41,11 +48,11 @@ class LocalOperator(RalfOperator):
     def __init__(
         self,
         frame: "FeatureFrame",
-        childrens: List["RalfOperator"],
+        children: List["RalfOperator"],
     ):
         self.frame = frame
         self.transform_object = self.frame.transform_object
-        self.childrens = childrens
+        self.children = children
         self.scheduler = frame.scheduler
 
         self.worker_thread = Thread(target=self._run_forever, daemon=True)
@@ -88,11 +95,6 @@ class LocalOperator(RalfOperator):
             # Application error, log and continue
             except Exception:
                 logging.exception("error in handling event")
-
-    def _send_to_children(self, records: List[Record]):
-        for record in records:
-            for children in self.childrens:
-                children.enqueue_event(record)
 
     def enqueue_event(self, record: Record):
         self.local_handle_event(record)
@@ -152,13 +154,13 @@ class OperatorActorPool:
 class RayOperator(RalfOperator):
     """Run transforms as part of sharded actor pool."""
 
-    def __init__(self, frame: "FeatureFrame", childrens: List["RalfOperator"]):
+    def __init__(self, frame: "FeatureFrame", children: List["RalfOperator"]):
         self.pool = OperatorActorPool.make_replicas(
             num_replicas=frame.config.ray_config.num_replicas,
             actor_class=RayLocalOperator,
-            init_kwargs={"frame": frame, "childrens": childrens},
+            init_kwargs={"frame": frame, "children": children},
         )
-        self.children = childrens
+        self.children = children
 
     def enqueue_event(self, record: Record):
         self.pool.choose_actor(repr(record)).local_handle_event.remote(record)
@@ -173,10 +175,101 @@ class RayOperator(RalfOperator):
 
 
 @dataclass
+class SimTraceRecord:
+    request_id: int
+    frame: str
+    start_time: float
+    end_time: float
+
+
+class SimpySink(RalfOperator):
+    def __init__(self):
+        self.recordings = []
+
+    def enqueue_event(self, record: Record):
+        self.recordings.append(record)
+
+    def dump_transform_state(self):
+        return self.recordings
+
+
+class SimpyOperator(RalfOperator):
+    """Skip running transform, but record the event ordering"""
+
+    def __init__(self, frame: "FeatureFrame", children: List["RalfOperator"]):
+        self.frame = frame
+        self.scheduler = frame.scheduler
+        self.config = frame.config.simpy_config
+        self.children = children
+
+        self.id = 0
+        env = self.config.shared_env
+        self.env = env
+
+        class SimulationWaker(WakerProtocol):
+            def __init__(self):
+                self.simpy_event = env.event()
+
+            def set(self):
+                self.simpy_event.succeed()
+
+            def wait(self, _timeout=None):
+                raise NotImplementedError("Use `yield waker.simpy_event` instead.")
+
+        self.scheduler.event_class = SimulationWaker
+        self.env.process(self.run_simulation_node())
+
+    def run_simulation_node(self):
+        while True:
+            record = self.scheduler.pop_event()
+            if record.is_wait_event():
+                yield record.entries.simpy_event
+                record = self.scheduler.pop_event()
+                assert record.is_data()
+
+            if isinstance(record.entries, DummyEntry):
+                # this is from source, let's modify it into trace record
+                request_id = self.id
+                self.id += 1
+            else:
+                request_id = record.entries.request_id
+
+            new_record = Record(
+                SimTraceRecord(
+                    request_id,
+                    str(self.frame),
+                    self.env.now,
+                    self.env.now + self.config.processing_time_s,
+                )
+            )
+            yield self.env.timeout(self.config.processing_time_s)
+
+            self._send_to_children([new_record])
+
+            if self.env.now > self.config.stop_after_s:
+                break
+
+    def enqueue_event(self, record: Record):
+        self.scheduler.push_event(record)
+
+
+@dataclass
 class RayOperatorConfig:
     num_replicas: int = 1
 
 
 @dataclass
+class SimpyOperatorConfig:
+    shared_env: simpy.Environment
+    processing_time_s: float
+    stop_after_s: float = float("inf")
+
+    def __post_init__(self):
+        assert self.processing_time_s > 0
+        assert self.stop_after_s > 0
+
+
+@dataclass
 class OperatorConfig:
-    ray_config: RayOperatorConfig = RayOperatorConfig()
+    ray_config: RayOperatorConfig = None
+    simpy_config: SimpyOperatorConfig = None

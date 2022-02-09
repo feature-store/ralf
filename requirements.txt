@@ -5,7 +5,7 @@ requests
 dataclasses
 more_itertools
 redis
-sympy
+simpy
 numpy
 pandas
 graphlib-backport

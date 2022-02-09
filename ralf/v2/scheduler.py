@@ -1,9 +1,20 @@
 import threading
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import List, Optional, Type
+
+from typing_extensions import Protocol, runtime_checkable
 
 from ralf.v2.record import Record
+
+
+@runtime_checkable
+class WakerProtocol(Protocol):
+    def set(self):
+        ...
+
+    def wait(self, timeout=None):
+        ...
 
 
 class BaseScheduler(ABC):
@@ -14,6 +25,8 @@ class BaseScheduler(ABC):
     worked on.
     """
 
+    event_class: Type[WakerProtocol] = threading.Event
+
     def wake_waiter_if_needed(self):
         if self.waker is not None:
             self.waker.set()
@@ -21,7 +34,7 @@ class BaseScheduler(ABC):
 
     def new_waker(self):
         assert self.waker is None
-        self.waker = threading.Event()
+        self.waker = self.event_class()
         return self.waker
 
     @abstractmethod
