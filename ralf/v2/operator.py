@@ -260,8 +260,8 @@ class RayOperatorConfig:
 
 @dataclass
 class SimpyOperatorConfig:
-    shared_env: simpy.Environment
-    processing_time_s: float
+    shared_env: simpy.Environment = None
+    processing_time_s: float = 0.1
     stop_after_s: float = float("inf")
 
     def __post_init__(self):
@@ -271,5 +271,5 @@ class SimpyOperatorConfig:
 
 @dataclass
 class OperatorConfig:
-    ray_config: RayOperatorConfig = None
-    simpy_config: SimpyOperatorConfig = None
+    ray_config: RayOperatorConfig = RayOperatorConfig()
+    simpy_config: SimpyOperatorConfig = SimpyOperatorConfig()
