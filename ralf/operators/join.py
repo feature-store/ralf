@@ -2,7 +2,9 @@ from abc import ABC, abstractmethod
 from typing import List, Optional
 
 from ralf.operator import DEFAULT_STATE_CACHE_SIZE, ActorPool, Operator
-from ralf.state import Record, Schema, TableState
+from ralf.state import Record, Schema
+from ralf.tables.connector import Connector
+from ralf.tables.table_state import TableState
 
 
 class LeftJoin(Operator, ABC):
@@ -11,12 +13,13 @@ class LeftJoin(Operator, ABC):
         schema: Schema,
         left_schema: Schema,
         right_schema: Schema,
+        connector: Connector,
         cache_size=DEFAULT_STATE_CACHE_SIZE,
         lazy: bool = False,
     ):
-        super().__init__(schema, cache_size, lazy)
-        self.left_table = TableState(schema=left_schema)
-        self.right_table = TableState(schema=right_schema)
+        super().__init__(schema, connector, cache_size, lazy)
+        self.left_table = TableState(schema=left_schema, connector=connector)
+        self.right_table = TableState(schema=right_schema, connector=connector)
 
         # handles didn't match if left as ActorHandle, so extract id
         self.left_ids = []

@@ -1,6 +1,13 @@
-import pytest
+import sqlite3
 
-from ralf.state import Record, Schema, TableState
+import pytest
+import redis
+
+from ralf.state import Record, Schema
+from ralf.tables.dict_connector import DictConnector
+from ralf.tables.redis_connector import RedisConnector
+from ralf.tables.sqlite_connector import SQLiteConnector
+from ralf.tables.table_state import TableState
 
 
 def test_record():
@@ -12,18 +19,27 @@ def test_record():
 
 
 def test_schema():
-    schema = Schema(primary_key="key", columns={"a": str, "b": int})
+    schema = Schema(primary_key="key", columns={"key": int, "a": str, "b": int})
 
     schema.validate_record(Record(key=1, a="a", b=1))
     with pytest.raises(AssertionError):
         schema.validate_record(Record(a="a"))
 
 
-def test_table_state():
-    state = TableState(Schema(primary_key="key", columns={"a": str}))
+dict_connector = DictConnector()
+sqlite_connector = SQLiteConnector(sqlite3.connect("test.db"))
+redis_connector = RedisConnector(redis.Redis())
+connectors = [dict_connector, sqlite_connector, redis_connector]
+
+
+@pytest.mark.parametrize("connector", connectors)
+def test_table_state(connector):
+    state = TableState(
+        Schema(primary_key="key", columns={"key": int, "a": str}), connector
+    )
     # test update
     state.update(Record(key=1, a="a"))
-    with pytest.raises(AttributeError):
+    with pytest.raises(AssertionError):  # what kind of error should be raised?
         state.update(Record(no_primary_key=2))
 
     # test point query
@@ -46,3 +62,12 @@ def test_table_state():
     state.delete(key=2)
     with pytest.raises(KeyError, match="not found"):
         state.point_query(2)
+    assert state.bulk_query() == [
+        Record(key=1, a="a"),
+    ]
+
+    assert state.debug_state() == {
+        "num_updates": 3,
+        "num_deletes": 1,
+        "num_records": 1,
+    }
