@@ -22,3 +22,6 @@ jobs:
     - name: Test installable
       run: |
         pip install -e . --verbose
+    - name: Test v2
+      run: |
+        pytest -v -s ralf/v2/tests
