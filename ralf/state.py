@@ -5,26 +5,26 @@ from typing import Any, Dict, Type
 
 
 class Record:
-    def __init__(self, **entries: Dict[str, Any]):
-        self.entries: Dict[str, Any] = entries
+    def __init__(self, **entry: Dict[str, Any]):
+        self.entry: Dict[str, Any] = entry
         self._source = None
         self.processing_time = time.time()
 
-        for k, v in entries.items():
+        for k, v in entry.items():
             setattr(self, k, v)
 
     # def __str__(self):
-    #     return str(self.entries)
+    #     return str(self.entry)
 
     def __repr__(self):
-        return f"Record({self.entries},processing_time={self.processing_time:.2f})"
+        return f"Record({self.entry},processing_time={self.processing_time:.2f})"
 
     def __eq__(self, other: "Record") -> bool:
-        return self.entries == other.entries and self._source == other._source
+        return self.entry == other.entry and self._source == other._source
 
     # TODO: Uhh this makes ray not work
     # def __dict__(self):
-    #    return self.entries
+    #    return self.entry
 
 
 class Schema:
@@ -36,7 +36,7 @@ class Schema:
     def validate_record(self, record: Record):
         # TODO: add type checking.
         schema_columns = set(self.columns.keys()).union(set([self.primary_key]))
-        record_columns = set(record.entries.keys())
+        record_columns = set(record.entry.keys())
         assert (
             schema_columns == record_columns
         ), f"schema columns are {schema_columns} but record has {record_columns}"

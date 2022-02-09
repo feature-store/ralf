@@ -21,7 +21,7 @@ class Record(Generic[T]):
     """Wrapper class for data "row" in transit within ralf."""
 
     # user provided data type
-    entries: Union[T, StopIteration, threading.Event]
+    entry: Union[T, StopIteration, threading.Event]
 
     # signify a tagged union
     type_: RecordType = RecordType.DATA
@@ -46,16 +46,16 @@ class Record(Generic[T]):
         return Record(event, type_=RecordType.WAIT_EVENT)
 
     def is_data(self) -> bool:
-        return is_dataclass(self.entries)
+        return is_dataclass(self.entry)
 
     def is_stop_iteration(self) -> bool:
-        return isinstance(self.entries, StopIteration)
+        return isinstance(self.entry, StopIteration)
 
     def is_wait_event(self) -> bool:
         from ralf.v2.scheduler import WakerProtocol
 
-        return isinstance(self.entries, WakerProtocol)
+        return isinstance(self.entry, WakerProtocol)
 
     def wait(self):
         assert self.is_wait_event()
-        self.entries.wait()
+        self.entry.wait()

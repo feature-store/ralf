@@ -29,8 +29,8 @@ class Sum(BaseTransform):
         self.history = []
 
     def on_event(self, record: Record[IntValue]):
-        self.history.append(record.entries.value)
-        self.state += record.entries.value
+        self.history.append(record.entry.value)
+        self.state += record.entry.value
         time.sleep(0.1)
         return None
 
@@ -77,9 +77,7 @@ def test_simpy_lifo():
     env.run(1)
 
     record_trace = app.wait()
-    assert record_trace[0].entries.request_id == 0
+    assert record_trace[0].entry.request_id == 0
 
-    request_ids = [
-        r.entries.request_id for r in record_trace if "Sum" in r.entries.frame
-    ]
+    request_ids = [r.entry.request_id for r in record_trace if "Sum" in r.entry.frame]
     assert request_ids == [0, 10, 19, 18, 17, 16, 15, 14, 13]

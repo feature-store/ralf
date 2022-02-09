@@ -161,7 +161,7 @@ def deploy_queryable_server():
     class RalfEncoder(json.encoder.JSONEncoder):
         def default(self, obj):
             if isinstance(obj, Record):
-                return obj.entries
+                return obj.entry
             elif isinstance(obj, np.ndarray):
                 return obj.tolist()
 
@@ -187,7 +187,7 @@ def deploy_queryable_server():
                 )
             resp = await self._queryable_tables[table_name].get_async(key)
             return fastapi.responses.Response(
-                json.dumps(resp.entries, cls=RalfEncoder), media_type="application/json"
+                json.dumps(resp.entry, cls=RalfEncoder), media_type="application/json"
             )
 
         @app.get("/table/{table_name:str}")
@@ -199,7 +199,7 @@ def deploy_queryable_server():
                 )
             resp = await self._queryable_tables[table_name].get_all_async()
             resp = [
-                record.entries for record in chain.from_iterable(resp)
+                record.entry for record in chain.from_iterable(resp)
             ]  # need to flatten the list
             return fastapi.responses.Response(
                 json.dumps(resp, cls=RalfEncoder), media_type="application/json"

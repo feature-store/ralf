@@ -223,16 +223,16 @@ class SimpyOperator(RalfOperator):
         while True:
             record = self.scheduler.pop_event()
             if record.is_wait_event():
-                yield record.entries.simpy_event
+                yield record.entry.simpy_event
                 record = self.scheduler.pop_event()
                 assert record.is_data()
 
-            if isinstance(record.entries, DummyEntry):
+            if isinstance(record.entry, DummyEntry):
                 # this is from source, let's modify it into trace record
                 request_id = self.id
                 self.id += 1
             else:
-                request_id = record.entries.request_id
+                request_id = record.entry.request_id
 
             new_record = Record(
                 SimTraceRecord(
