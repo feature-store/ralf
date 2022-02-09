@@ -222,7 +222,7 @@ class Operator(ABC):
         event = Event(
             lambda: self._on_record_helper(record), record, self._processing_policy
         )
-        key = record.entry[self._table.schema.primary_key]
+        key = record.entries[self._table.schema.primary_key]
         self._events[key].put(event)
         self._empty_queue_event.set()
 
