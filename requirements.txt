@@ -9,4 +9,3 @@ sympy
 numpy
 pandas
 graphlib-backport
-event-metrics==0.1.0
