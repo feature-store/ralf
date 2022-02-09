@@ -9,4 +9,4 @@ sympy
 numpy
 pandas
 graphlib-backport
-git+https://github.com/simon-mo/event_metrics@v0.1
+event-metrics==0.1.0
