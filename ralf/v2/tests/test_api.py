@@ -86,7 +86,7 @@ def test_simpy_lifo():
 def test_ray_wait():
     app = RalfApplication(RalfConfig(deploy_mode="ray"))
 
-    sink = app.source(CounterSource(10)).transform(
+    app.source(CounterSource(10)).transform(
         Sum(),
         LIFO(),
         operator_config=OperatorConfig(ray_config=RayOperatorConfig(num_replicas=2)),
