@@ -6,7 +6,7 @@ import pytest
 import simpy
 
 from ralf.v2 import LIFO, BaseTransform, RalfApplication, RalfConfig, Record
-from ralf.v2.operator import OperatorConfig, SimpyOperatorConfig
+from ralf.v2.operator import OperatorConfig, RayOperatorConfig, SimpyOperatorConfig
 
 IntValue = make_dataclass("IntValue", ["value"])
 
@@ -81,3 +81,15 @@ def test_simpy_lifo():
 
     request_ids = [r.entry.request_id for r in record_trace if "Sum" in r.entry.frame]
     assert request_ids == [0, 10, 19, 18, 17, 16, 15, 14, 13]
+
+
+def test_ray_wait():
+    app = RalfApplication(RalfConfig(deploy_mode="ray"))
+
+    sink = app.source(CounterSource(10)).transform(
+        Sum(),
+        LIFO(),
+        operator_config=OperatorConfig(ray_config=RayOperatorConfig(num_replicas=2)),
+    )
+    app.deploy()
+    app.wait()
