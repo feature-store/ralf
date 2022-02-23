@@ -40,7 +40,6 @@ def test_kc_comparisions():
     kc_two = KeyCount(4, 1, records[1])
 
     assert kc_one < kc_two
-    assert (records[0], kc_one.process())
     assert kc_one > kc_two
 
 
