@@ -1,11 +1,12 @@
+import heapq
 import threading
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import List, Optional, Type
-import heapq
 from functools import total_ordering
+from typing import List, Optional, Type
+
 from typing_extensions import Protocol, runtime_checkable
-import math
+
 from ralf.v2.record import Record
 
 
@@ -79,6 +80,7 @@ class LIFO(BaseScheduler):
             return Record.make_wait_event(self.new_waker())
         return self.queue.pop(-1)
 
+
 @total_ordering
 class KeyCount:
     def __init__(self, key, num_processed, record):
@@ -95,18 +97,24 @@ class KeyCount:
 
     def __eq__(self, other):
         return self.key == other.key and self.num_processed == other.num_processed
-    
+
     def __lt__(self, other):
-        return int(len(self.records) == 0) * 1000000000 +  self.num_processed < other.num_processed + int(len(other.records) == 0) * 1000000000
+        return (
+            int(len(self.records) == 0) * 1000000000 + self.num_processed
+            < other.num_processed + int(len(other.records) == 0) * 1000000000
+        )
 
     def __gt__(self, other):
-        return int(len(self.records) == 0) * 1000000000 +  self.num_processed > other.num_processed + int(len(other.records) == 0) * 1000000000
+        return (
+            int(len(self.records) == 0) * 1000000000 + self.num_processed
+            > other.num_processed + int(len(other.records) == 0) * 1000000000
+        )
 
     def __repr__(self):
         return f"KeyCount(key : {self.key}, num_processed : {self.num_processed}, # of records : {len(self.records)}"
 
-class LeastUpdate(BaseScheduler):
 
+class LeastUpdate(BaseScheduler):
     def __init__(self) -> None:
         self.seen_keys = dict()
         self.queue: List[KeyCount] = []
@@ -116,8 +124,8 @@ class LeastUpdate(BaseScheduler):
     def push_event(self, record: Record):
         if record.is_stop_iteration():
             kc = KeyCount("stop", 0, record)
-            self.queue.insert(0, kc) 
-            return 
+            self.queue.insert(0, kc)
+            return
         key = record.entry.key
         if key not in self.seen_keys:
             kc = KeyCount(key, 0, record)
@@ -128,9 +136,13 @@ class LeastUpdate(BaseScheduler):
             kc.add_record(record)
 
             heapq.heapify(self.queue)
-            #print(self.queue[0])
+            # print(self.queue[0])
             if len(self.queue[0].records) == 0:
-                print(self.num_unprocessed, sum([len(i.records) for i in self.queue]), [[len(i.records), i.key, i.num_processed] for i in self.queue])
+                print(
+                    self.num_unprocessed,
+                    sum([len(i.records) for i in self.queue]),
+                    [[len(i.records), i.key, i.num_processed] for i in self.queue],
+                )
         self.wake_waiter_if_needed()
 
     def pop_event(self) -> Record:
@@ -140,9 +152,10 @@ class LeastUpdate(BaseScheduler):
         if len(least_updated.records) == 0:
             return Record.make_wait_event(self.new_waker())
         record = least_updated.process()
-        #self.num_unprocessed -= 1
+        # self.num_unprocessed -= 1
         heapq.heappush(self.queue, least_updated)
         return record
+
 
 @dataclass
 class DummyEntry:
