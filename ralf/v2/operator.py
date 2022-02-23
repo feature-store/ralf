@@ -163,7 +163,13 @@ class RayOperator(RalfOperator):
         self.children = children
 
     def enqueue_event(self, record: Record):
-        self.pool.choose_actor(repr(record)).local_handle_event.remote(record)
+        if record.is_data():
+            # TODO(simon): shard by key instead?
+            self.pool.choose_actor(repr(record)).local_handle_event.remote(record)
+        elif record.is_stop_iteration():  # broadcast termination event
+            [actor.local_handle_event.remote(record) for actor in self.pool.handles]
+        else:
+            raise Exception(f"Can't enqueue_event for event type {record.type_}")
 
     def dump_transform_state(self) -> List["BaseTransform"]:
         return sum(
@@ -273,3 +279,9 @@ class SimpyOperatorConfig:
 class OperatorConfig:
     ray_config: RayOperatorConfig = RayOperatorConfig()
     simpy_config: SimpyOperatorConfig = SimpyOperatorConfig()
+
+    def __post_init__(self):
+        assert isinstance(self.ray_config, RayOperatorConfig), type(self.ray_config)
+        assert isinstance(self.simpy_config, SimpyOperatorConfig), type(
+            self.simpy_config
+        )
