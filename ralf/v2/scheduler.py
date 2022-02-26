@@ -1,3 +1,4 @@
+import functools
 import threading
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -45,16 +46,34 @@ class BaseScheduler(ABC):
     def pop_event(self) -> Record:
         pass
 
+    def __repr__(self):
+        return self.__class__.__name__
+
+
+# TODO(simon): figure out a way to attach this generically to all scheduler
+global_lock = threading.Lock()
+
+
+def synchronized(f):
+    @functools.wraps(f)
+    def wrapper(*args, **kwargs):
+        with global_lock:
+            return f(*args, **kwargs)
+
+    return wrapper
+
 
 class FIFO(BaseScheduler):
     def __init__(self) -> None:
         self.queue: List[Record] = []
         self.waker: Optional[threading.Event] = None
 
+    @synchronized
     def push_event(self, record: Record):
         self.wake_waiter_if_needed()
         self.queue.append(record)
 
+    @synchronized
     def pop_event(self) -> Record:
         if len(self.queue) == 0:
             return Record.make_wait_event(self.new_waker())
@@ -66,6 +85,7 @@ class LIFO(BaseScheduler):
         self.queue: List[Record] = []
         self.waker: Optional[threading.Event] = None
 
+    @synchronized
     def push_event(self, record: Record):
         self.wake_waiter_if_needed()
         if record.is_stop_iteration():
@@ -73,6 +93,7 @@ class LIFO(BaseScheduler):
         else:
             self.queue.append(record)
 
+    @synchronized
     def pop_event(self) -> Record:
         if len(self.queue) == 0:
             return Record.make_wait_event(self.new_waker())

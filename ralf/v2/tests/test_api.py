@@ -7,8 +7,12 @@ import simpy
 
 from ralf.v2 import LIFO, BaseTransform, RalfApplication, RalfConfig, Record
 from ralf.v2.operator import OperatorConfig, RayOperatorConfig, SimpyOperatorConfig
+from ralf.v2.utils import get_logger
 
 IntValue = make_dataclass("IntValue", ["value"])
+
+
+logger = get_logger()
 
 
 class CounterSource(BaseTransform):
@@ -16,11 +20,12 @@ class CounterSource(BaseTransform):
         self.count = 0
         self.up_to = up_to
 
-    def on_event(self, _: Record) -> Record[IntValue]:
+    def on_event(self, record: Record) -> Record[IntValue]:
         self.count += 1
         if self.count >= self.up_to:
+            logger.msg("self.count reached to self.up_to, sending StopIteration")
             raise StopIteration()
-        return Record(IntValue(value=self.count))
+        return Record(id_=record.id_, entry=IntValue(value=self.count))
 
 
 class Sum(BaseTransform):
