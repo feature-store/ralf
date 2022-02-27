@@ -9,3 +9,5 @@ simpy
 numpy
 pandas
 graphlib-backport
+event_metrics==0.2.0
+structlog

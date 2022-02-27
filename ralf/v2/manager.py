@@ -1,3 +1,4 @@
+import time
 from abc import ABC, abstractmethod
 from graphlib import TopologicalSorter
 from typing import TYPE_CHECKING, Dict, List, Type
@@ -9,11 +10,11 @@ from ralf.v2.operator import (
     RalfOperator,
     RayOperator,
     SimpyOperator,
-    SimpySink,
+    _SimpySink,
 )
 
 if TYPE_CHECKING:
-    from ralf.v2.api import FeatureFrame
+    from ralf.v2.api import FeatureFrame, RalfConfig
 
 
 class RalfManager(ABC):
@@ -24,8 +25,9 @@ class RalfManager(ABC):
 
     operator_cls: Type[RalfOperator]
 
-    def __init__(self):
+    def __init__(self, config: "RalfConfig"):
         self.operators: Dict["FeatureFrame", RalfOperator] = dict()
+        self.config = config
 
     def deploy(self, graph: Dict["FeatureFrame", List["FeatureFrame"]]):
         sorted_order: List["FeatureFrame"] = list(
@@ -35,6 +37,7 @@ class RalfManager(ABC):
             operator = self.operator_cls(
                 frame,
                 children=[self.operators[f] for f in graph[frame]],
+                ralf_config=self.config,
             )
             self.operators[frame] = operator
 
@@ -58,15 +61,21 @@ class RayManager(RalfManager):
 
     operator_cls: Type[RalfOperator] = RayOperator
 
-    def __init__(self):
+    def __init__(self, config):
         if not ray.is_initialized():
             ray.init()
-        super().__init__()
+        super().__init__(config)
 
     def wait(self):
+        refs = []
         for operator in self.operators.values():
             for handle in operator.pool.handles:
-                ray.wait([handle.wait_for_exit.remote()], num_returns=1)
+                refs.append(handle.wait_for_exit.remote())
+        while True:
+            _, not_done = ray.wait(refs, num_returns=len(refs), timeout=0.5)
+            if len(not_done) == 0:
+                break
+            time.sleep(1)
 
 
 class SimpyManager(RalfManager):
@@ -74,13 +83,10 @@ class SimpyManager(RalfManager):
 
     operator_cls: Type[RalfOperator] = SimpyOperator
 
-    def __init__(self):
-        super().__init__()
-
     def deploy(self, graph: Dict["FeatureFrame", List["FeatureFrame"]]):
         super().deploy(graph)
 
-        self.sink = SimpySink()
+        self.sink = _SimpySink()
         for operator in self.operators.values():
             operator.children.append(self.sink)
 

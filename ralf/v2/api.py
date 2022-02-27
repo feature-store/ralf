@@ -1,6 +1,11 @@
+import os
+import stat
+import tempfile
+import time
 from abc import abstractmethod
 from collections import deque
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Deque, Dict, Iterable, List, Optional, Type, Union
 
 from typing_extensions import Literal
@@ -9,12 +14,15 @@ from ralf.v2.manager import LocalManager, RalfManager, RayManager, SimpyManager
 from ralf.v2.operator import OperatorConfig
 from ralf.v2.record import Record
 from ralf.v2.scheduler import FIFO, BaseScheduler, SourceScheduler
+from ralf.v2.utils import MERGE_DB_SCRIPTS, get_logger
 
 SUPPORTED_DEPLOY_MODES = {
     "local": LocalManager,
     "ray": RayManager,
     "simpy": SimpyManager,
 }
+
+logger = get_logger()
 
 
 @dataclass
@@ -23,11 +31,23 @@ class RalfConfig:
 
     deploy_mode: Union[Literal["local"], Literal["ray"], Literal["simpy"]]
 
-    # TODO(simon): implement metrics tracking
-    # metrics_dir: Optional[str] = None
+    metrics_dir: Optional[str] = None
 
     def __post_init__(self):
         assert self.deploy_mode.lower() in SUPPORTED_DEPLOY_MODES
+        if self.metrics_dir is None:
+            path = Path(tempfile.gettempdir()) / "ralf_metrics" / str(int(time.time()))
+            path.mkdir(parents=True)
+            self.metrics_dir = str(path)
+
+        # Embed a script to merge metrics databases
+        script_path = os.path.join(self.metrics_dir, "merge_db.sh")
+        with open(script_path, "w") as f:
+            f.write(MERGE_DB_SCRIPTS)
+        os.chmod(script_path, stat.S_IEXEC | os.stat(script_path).st_mode)
+
+        logger.msg(f"Using deployment mode {self.deploy_mode}")
+        logger.msg(f"Using metrics directory {self.metrics_dir}")
 
     def get_manager_cls(self) -> Type[RalfManager]:
         return SUPPORTED_DEPLOY_MODES[self.deploy_mode]
@@ -46,6 +66,9 @@ class BaseTransform:
         """
         raise NotImplementedError("To be implemented by subclass.")
 
+    def __repr__(self):
+        return self.__class__.__name__
+
 
 class FeatureFrame:
     """Encapsulate a feature transformation and its related policies configuration."""
@@ -60,6 +83,14 @@ class FeatureFrame:
         self.scheduler = scheduler
         self.config = operator_config
         self.children: List["FeatureFrame"] = []
+        logger.msg(
+            "Created FeatureFrame",
+            transform=transform_object,
+            scheduler=scheduler,
+            config=operator_config
+            if operator_config != OperatorConfig()
+            else "default",
+        )
 
     def transform(
         self,
@@ -73,7 +104,7 @@ class FeatureFrame:
         return frame
 
     def __repr__(self) -> str:
-        return f"FeatureFrame({self.transform_object})"
+        return f"FeatureFrame({repr(self.transform_object)})"
 
 
 class RalfApplication:
@@ -81,7 +112,7 @@ class RalfApplication:
 
     def __init__(self, config: RalfConfig):
         self.config = config
-        self.manager: RalfManager = self.config.get_manager_cls()()
+        self.manager: RalfManager = self.config.get_manager_cls()(self.config)
         # used by walking graph for deploy
         self.source_frame: Optional[FeatureFrame] = None
 

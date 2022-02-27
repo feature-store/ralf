@@ -1,7 +1,8 @@
 import enum
 import threading
 from dataclasses import dataclass, is_dataclass
-from typing import Generic, TypeVar, Union
+from time import time_ns
+from typing import Generic, Optional, TypeVar, Union
 
 
 class RecordType(enum.Enum):
@@ -23,10 +24,19 @@ class Record(Generic[T]):
     # user provided data type
     entry: Union[T, StopIteration, threading.Event]
 
+    # shard key
+    shard_key: str = ""
+
     # signify a tagged union
     type_: RecordType = RecordType.DATA
 
+    # unique id
+    id_: Optional[int] = None
+
     def __post_init__(self):
+        if self.id_ is None:
+            self.id_ = time_ns()
+
         assert self.type_ in RecordType
         if self.type_ == RecordType.DATA:
             assert self.is_data()
@@ -36,6 +46,8 @@ class Record(Generic[T]):
             assert self.is_wait_event()
         else:
             raise ValueError("Unknown type.")
+
+        assert isinstance(self.shard_key, str)
 
     @staticmethod
     def make_stop_iteration():
