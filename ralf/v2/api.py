@@ -37,7 +37,7 @@ class RalfConfig:
         assert self.deploy_mode.lower() in SUPPORTED_DEPLOY_MODES
         if self.metrics_dir is None:
             path = Path(tempfile.gettempdir()) / "ralf_metrics" / str(int(time.time()))
-            path.mkdir(parents=True)
+            path.mkdir(parents=True, exist_ok=True)
             self.metrics_dir = str(path)
 
         # Embed a script to merge metrics databases

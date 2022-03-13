@@ -10,7 +10,7 @@ from ralf.core import Ralf
 from ralf.operator import DEFAULT_STATE_CACHE_SIZE, Operator
 from ralf.operators.source import Source
 from ralf.policies import load_shedding_policy, processing_policy
-from ralf.state import Record, Schema
+from ralf.record import Record, Schema
 from ralf.table import Table
 
 

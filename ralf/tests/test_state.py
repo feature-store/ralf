@@ -3,11 +3,11 @@ import sqlite3
 import pytest
 import redis
 
-from ralf.state import Record, Schema
-from ralf.tables.dict_connector import DictConnector
-from ralf.tables.redis_connector import RedisConnector
-from ralf.tables.sqlite_connector import SQLiteConnector
-from ralf.tables.table_state import TableState
+from ralf.record import Record, Schema
+from ralf.state.dict_connector import DictConnector
+from ralf.state.redis_connector import RedisConnector
+from ralf.state.sqlite_connector import SQLiteConnector
+from ralf.state.table_state import TableState
 
 
 def test_record():

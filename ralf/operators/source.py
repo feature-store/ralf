@@ -8,7 +8,7 @@ import ray
 from ray.actor import ActorHandle
 
 from ralf.operator import DEFAULT_STATE_CACHE_SIZE, Operator
-from ralf.state import Record, Schema
+from ralf.record import Record, Schema
 
 
 class Source(Operator, ABC):

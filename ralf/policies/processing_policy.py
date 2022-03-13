@@ -1,6 +1,6 @@
 from typing import Dict
 
-from ralf.state import Record
+from ralf.record import Record
 
 
 def fifo(first: Record, second: Record):

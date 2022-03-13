@@ -1,5 +1,5 @@
 from ralf.policies import processing_policy
-from ralf.state import Record
+from ralf.record import Record
 
 
 def test_fifo():

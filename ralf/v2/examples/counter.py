@@ -60,7 +60,8 @@ class Sum(BaseTransform):
 
 if __name__ == "__main__":
 
-    deploy_mode = "local"
+    deploy_mode = "ray"
+    #deploy_mode = "local"
     app = RalfApplication(RalfConfig(deploy_mode=deploy_mode))
 
     source_ff = app.source(

@@ -14,8 +14,10 @@ import ray
 from ray.actor import ActorHandle
 
 from ralf.policies import load_shedding_policy, processing_policy
-from ralf.record import Record, Schema, TableState
-from ralf.state import Connector
+from ralf.record import Record, Schema
+from ralf.state.table_state import TableState
+from ralf.state.connector import Connector
+from ralf.state.dict_connector import DictConnector
 
 DEFAULT_STATE_CACHE_SIZE: int = 0
 
@@ -121,7 +123,6 @@ class Operator(ABC):
     def __init__(
         self,
         schema: Schema,
-        connector: Connector,
         cache_size=DEFAULT_STATE_CACHE_SIZE,
         lazy: bool = False,
         num_worker_threads: int = 4,
@@ -129,6 +130,7 @@ class Operator(ABC):
         load_shedding_policy: Callable[
             [Record, Record], bool
         ] = load_shedding_policy.always_process,
+        connector: Connector = DictConnector(),
     ):
 
         # Mained output table state

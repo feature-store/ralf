@@ -9,7 +9,7 @@ import ray
 from ralf.core import Ralf
 from ralf.operator import Operator
 from ralf.operators import Source
-from ralf.state import Record, Schema
+from ralf.record import Record, Schema
 from ralf.table import Table
 
 

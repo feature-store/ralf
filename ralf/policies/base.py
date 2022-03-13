@@ -1,7 +1,7 @@
 import random
 from typing import List
 
-from ralf.state import Record
+from ralf.record import Record
 
 
 class LoadSheddingPolicy:

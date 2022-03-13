@@ -1,5 +1,5 @@
 from ralf.policies import load_shedding_policy
-from ralf.state import Record
+from ralf.record import Record
 
 
 def test_always_process():

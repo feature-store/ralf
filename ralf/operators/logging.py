@@ -3,8 +3,8 @@ from typing import Optional, Type
 import ray
 
 from ralf.operator import DEFAULT_STATE_CACHE_SIZE, Operator
-from ralf.state import Record, Schema
-from ralf.tables import Connector
+from ralf.record import Record, Schema
+from ralf.state.connector import Connector
 
 
 @ray.remote
