@@ -6,7 +6,6 @@ from abc import ABC, abstractmethod
 from collections import OrderedDict, defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from queue import PriorityQueue
-from ralf.queue import SingleQueue, KeyQueue
 
 from typing import Callable, List, Optional
 
@@ -15,8 +14,8 @@ import ray
 from ray.actor import ActorHandle
 
 from ralf.policies import load_shedding_policy, processing_policy
-from ralf.state import Record, Schema, TableState
-from ralf.tables import Connector
+from ralf.record import Record, Schema, TableState
+from ralf.state import Connector
 
 DEFAULT_STATE_CACHE_SIZE: int = 0
 

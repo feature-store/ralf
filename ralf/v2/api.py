@@ -79,6 +79,7 @@ class FeatureFrame:
 class RalfApplication:
     """An end to end feature processing pipeline in Ralf."""
 
+
     def __init__(self, config: RalfConfig):
         self.config = config
         self.manager: RalfManager = self.config.get_manager_cls()()
@@ -91,6 +92,9 @@ class RalfApplication:
         operator_config: OperatorConfig = OperatorConfig(),
     ) -> FeatureFrame:
         """Create a source feature frame with source transformation."""
+
+        # TODO: support multiple sources
+
         if self.source_frame is not None:
             raise NotImplementedError("Multiple source is not supported.")
         self.source_frame = FeatureFrame(

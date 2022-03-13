@@ -64,8 +64,8 @@ def test_simpy_lifo():
             )
         ),
     ).transform(
-        Sum(),
-        LIFO(),
+        transform_object=Sum(),
+        scheduler=LIFO(),
         operator_config=OperatorConfig(
             simpy_config=SimpyOperatorConfig(shared_env=env, processing_time_s=0.1)
         ),

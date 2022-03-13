@@ -5,7 +5,7 @@ import pytest
 import ray
 from ray.util.queue import Empty, Queue
 
-from ralf import PrioritizationPolicy
+from ralf.policies.base import PrioritizationPolicy
 from ralf.core import Ralf
 from ralf.operator import DEFAULT_STATE_CACHE_SIZE, Operator
 from ralf.operators.source import Source

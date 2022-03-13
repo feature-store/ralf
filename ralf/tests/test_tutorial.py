@@ -21,7 +21,7 @@ from collections import defaultdict
 import numpy as np
 import pandas as pd
 
-from ralf import LoadSheddingPolicy, Operator, Ralf, RalfClient, Record, Schema
+from ralf.policies.base import LoadSheddingPolicy, Operator, Ralf, RalfClient, Record, Schema
 from ralf.operators.source import SourceOperator
 
 ralf_server = Ralf()
