@@ -1,21 +1,28 @@
 import asyncio
 import hashlib
-import logging
+import time
 from abc import ABC, abstractmethod
+from collections import defaultdict
 from collections.abc import Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass
 from threading import Thread
-from typing import TYPE_CHECKING, Any, Dict, List, Tuple, Type
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type
 
+import event_metrics
 import ray
 import simpy
+import structlog
 from ray.actor import ActorHandle
 
 from ralf.v2.record import Record
 from ralf.v2.scheduler import DummyEntry, WakerProtocol
+from ralf.v2.utils import get_logger, set_metrics_conn
 
 if TYPE_CHECKING:
-    from ralf.v2.api import BaseTransform, FeatureFrame
+    from ralf.v2.api import BaseTransform, FeatureFrame, RalfConfig
+
+logger = get_logger()
 
 
 class RalfOperator(ABC):
@@ -26,20 +33,20 @@ class RalfOperator(ABC):
         self,
         frame: "FeatureFrame",
         children: List["RalfOperator"],
+        ralf_config: "RalfConfig",
     ):
         pass
 
     @abstractmethod
-    def enqueue_event(self, record: Record):
+    def enqueue_events(self, records: List[Record]):
         pass
 
     def dump_transform_state(self) -> List["BaseTransform"]:
         pass
 
     def _send_to_children(self, records: List[Record]):
-        for record in records:
-            for children in self.children:
-                children.enqueue_event(record)
+        for children in self.children:
+            children.enqueue_events(records)
 
 
 class LocalOperator(RalfOperator):
@@ -49,29 +56,75 @@ class LocalOperator(RalfOperator):
         self,
         frame: "FeatureFrame",
         children: List["RalfOperator"],
+        ralf_config: "RalfConfig",
+        context: Optional[Dict] = {"shard_idx": 0},
     ):
         self.frame = frame
         self.transform_object = self.frame.transform_object
         self.children = children
         self.scheduler = frame.scheduler
+        self.context = context
+        self.config = ralf_config
+
+        structlog.threadlocal.bind_threadlocal(
+            frame=self.frame,
+            context=self.context,
+            thread="main",
+        )
 
         self.worker_thread = Thread(target=self._run_forever, daemon=True)
         self.worker_thread.start()
 
     def _run_forever(self):
-        while True:
-            next_event = self.scheduler.pop_event()
+        structlog.threadlocal.bind_threadlocal(
+            frame=self.frame,
+            context=self.context,
+            thread="worker",
+        )
 
-            # Wait for record here
-            if next_event.is_wait_event():
-                next_event.wait()
+        db_path = f"{self.config.metrics_dir}/{str(self.frame.transform_object)}_{self.context['shard_idx']}.db"
+        metrics_connection = event_metrics.MetricConnection(
+            db_path,
+            default_labels={
+                **self.context,
+                **dict(transform=str(self.frame.transform_object)),
+            },
+        )
+        logger.msg(f"Store metrics at {db_path}")
+        set_metrics_conn(metrics_connection)
+
+        error_count = 0
+        max_error_count = 10
+
+        @contextmanager
+        def time_and_count(metric_name, labels={}):
+            start_ns = time.time_ns()
+            yield
+            duration_ns = time.time_ns() - start_ns
+            metrics_connection.observe(
+                f"{metric_name}_duration_ns", duration_ns, labels=labels
+            )
+            metrics_connection.increment(f"{metric_name}_counter", labels=labels)
+
+        while True:
+            with time_and_count("pop_event"):
                 next_event = self.scheduler.pop_event()
-                assert not next_event.is_wait_event()
+
+                # Wait for record here
+                if not isinstance(next_event, list) and next_event.is_wait_event():
+                    with time_and_count("wait_pop_event"):
+                        next_event.wait()
+                        next_event = self.scheduler.pop_event()
+                        assert isinstance(next_event, list) or not next_event.is_wait_event()
 
             try:
                 # Process the record
-                if next_event.is_data():
-                    out = self.transform_object.on_event(next_event)
+                if isinstance(next_event, list) or next_event.is_data():
+                    with time_and_count("transform_on_event"):
+                        if isinstance(next_event, list):
+                            out = self.transform_object.on_events(next_event)
+                        else:
+                            out = self.transform_object.on_event(next_event)
                     if isinstance(out, Record):
                         self._send_to_children([out])
                     elif isinstance(out, Sequence):
@@ -90,17 +143,27 @@ class LocalOperator(RalfOperator):
                         "Unknown record type, it should be either data or stop iteration."
                     )
             except StopIteration:
+                logger.msg(
+                    "operator received StopIteration, propogating and exiting..."
+                )
                 self._send_to_children([Record.make_stop_iteration()])
                 break
             # Application error, log and continue
             except Exception:
-                logging.exception("error in handling event")
+                error_count += 1
+                logger.msg("error in handling event", error_count=error_count)
+                logger.exception("exception", exc_info=True)
+                if error_count == max_error_count:
+                    logger.msg("operator has errored too much, exiting")
+                    self._send_to_children([Record.make_stop_iteration()])
+                    break
 
-    def enqueue_event(self, record: Record):
-        self.local_handle_event(record)
+    def enqueue_events(self, records: List[Record]):
+        self.local_handle_events(records)
 
-    def local_handle_event(self, record: Record):
-        self.scheduler.push_event(record)
+    def local_handle_events(self, records: List[Record]):
+        for record in records:
+            self.scheduler.push_event(record)
 
     def dump_transform_state(self) -> List["BaseTransform"]:
         return [self.transform_object]
@@ -112,6 +175,7 @@ class RayLocalOperator(LocalOperator):
         while True:
             await asyncio.sleep(1)
             if not self.worker_thread.is_alive():
+                logger.msg("Worker thread exited!", frame=self.frame)
                 break
 
 
@@ -134,7 +198,7 @@ class OperatorActorPool:
 
         handles = []
         for i in range(num_replicas):
-
+            init_kwargs["context"] = {"shard_idx": i}
             handle = actor_class.options(**actor_options).remote(
                 *init_args, **init_kwargs
             )
@@ -154,16 +218,48 @@ class OperatorActorPool:
 class RayOperator(RalfOperator):
     """Run transforms as part of sharded actor pool."""
 
-    def __init__(self, frame: "FeatureFrame", children: List["RalfOperator"]):
+    def __init__(
+        self,
+        frame: "FeatureFrame",
+        children: List["RalfOperator"],
+        ralf_config: "RalfConfig",
+    ):
+        self.frame = frame
         self.pool = OperatorActorPool.make_replicas(
             num_replicas=frame.config.ray_config.num_replicas,
             actor_class=RayLocalOperator,
-            init_kwargs={"frame": frame, "children": children},
+            init_kwargs={
+                "frame": frame,
+                "children": children,
+                "ralf_config": ralf_config,
+            },
         )
         self.children = children
 
-    def enqueue_event(self, record: Record):
-        self.pool.choose_actor(repr(record)).local_handle_event.remote(record)
+    def _check_sharding_key_exist_if_necessary(self, records: List[Record]):
+        if len(records) == 0: return 
+        r = records[0]
+        if r.is_data() and len(self.pool.handles) > 1:
+            assert (
+                r.shard_key != ""
+            ), f"{self.frame} is sharded but no shard key preset."
+
+    def enqueue_events(self, records: List[Record]):
+        self._check_sharding_key_exist_if_necessary(records)
+
+        actor_map = defaultdict(list)
+        for record in records:
+            if record.is_data():
+                actor_map[self.pool.choose_actor(record.shard_key)].append(record)
+            elif record.is_stop_iteration():  # broadcast termination event
+                [
+                    actor.local_handle_events.remote([record])
+                    for actor in self.pool.handles
+                ]
+            else:
+                raise Exception(f"Can't enqueue_events for event type {record.type_}")
+        for handle, replica_records in actor_map.items():
+            handle.local_handle_events.remote(replica_records)
 
     def dump_transform_state(self) -> List["BaseTransform"]:
         return sum(
@@ -182,12 +278,12 @@ class SimTraceRecord:
     end_time: float
 
 
-class SimpySink(RalfOperator):
+class _SimpySink(RalfOperator):
     def __init__(self):
         self.recordings = []
 
-    def enqueue_event(self, record: Record):
-        self.recordings.append(record)
+    def enqueue_events(self, records: List[Record]):
+        self.recordings.extend(records)
 
     def dump_transform_state(self):
         return self.recordings
@@ -196,7 +292,12 @@ class SimpySink(RalfOperator):
 class SimpyOperator(RalfOperator):
     """Skip running transform, but record the event ordering"""
 
-    def __init__(self, frame: "FeatureFrame", children: List["RalfOperator"]):
+    def __init__(
+        self,
+        frame: "FeatureFrame",
+        children: List["RalfOperator"],
+        ralf_config: "RalfConfig",
+    ):
         self.frame = frame
         self.scheduler = frame.scheduler
         self.config = frame.config.simpy_config
@@ -249,8 +350,9 @@ class SimpyOperator(RalfOperator):
             if self.env.now > self.config.stop_after_s:
                 break
 
-    def enqueue_event(self, record: Record):
-        self.scheduler.push_event(record)
+    def enqueue_events(self, records: List[Record]):
+        for record in records:
+            self.scheduler.push_event(record)
 
 
 @dataclass
@@ -273,3 +375,9 @@ class SimpyOperatorConfig:
 class OperatorConfig:
     ray_config: RayOperatorConfig = RayOperatorConfig()
     simpy_config: SimpyOperatorConfig = SimpyOperatorConfig()
+
+    def __post_init__(self):
+        assert isinstance(self.ray_config, RayOperatorConfig), type(self.ray_config)
+        assert isinstance(self.simpy_config, SimpyOperatorConfig), type(
+            self.simpy_config
+        )

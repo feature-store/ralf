@@ -6,9 +6,13 @@ import pytest
 import simpy
 
 from ralf.v2 import LIFO, BaseTransform, RalfApplication, RalfConfig, Record
-from ralf.v2.operator import OperatorConfig, SimpyOperatorConfig
+from ralf.v2.operator import OperatorConfig, RayOperatorConfig, SimpyOperatorConfig
+from ralf.v2.utils import get_logger
 
 IntValue = make_dataclass("IntValue", ["value"])
+
+
+logger = get_logger()
 
 
 class CounterSource(BaseTransform):
@@ -16,11 +20,12 @@ class CounterSource(BaseTransform):
         self.count = 0
         self.up_to = up_to
 
-    def on_event(self, _: Record) -> Record[IntValue]:
+    def on_event(self, record: Record) -> Record[IntValue]:
         self.count += 1
         if self.count >= self.up_to:
+            logger.msg("self.count reached to self.up_to, sending StopIteration")
             raise StopIteration()
-        return Record(IntValue(value=self.count))
+        return Record(id_=record.id_, entry=IntValue(value=self.count))
 
 
 class Sum(BaseTransform):
@@ -81,3 +86,15 @@ def test_simpy_lifo():
 
     request_ids = [r.entry.request_id for r in record_trace if "Sum" in r.entry.frame]
     assert request_ids == [0, 10, 19, 18, 17, 16, 15, 14, 13]
+
+
+def test_ray_wait():
+    app = RalfApplication(RalfConfig(deploy_mode="ray"))
+
+    app.source(CounterSource(10)).transform(
+        Sum(),
+        LIFO(),
+        operator_config=OperatorConfig(ray_config=RayOperatorConfig(num_replicas=2)),
+    )
+    app.deploy()
+    app.wait()
