@@ -69,6 +69,14 @@ class BaseTransform:
     def __repr__(self):
         return self.__class__.__name__
 
+    def get(self, key): 
+        """Get current feature value for key. Returns null by default. 
+
+        :param key: key to lookup feature value
+        :type key: str
+        """
+        return None
+
 
 class FeatureFrame:
     """Encapsulate a feature transformation and its related policies configuration."""

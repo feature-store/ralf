@@ -41,6 +41,10 @@ class RalfOperator(ABC):
     def enqueue_events(self, records: List[Record]):
         pass
 
+    @abstractmethod
+    def get(self, key) -> Record:
+        pass
+
     def dump_transform_state(self) -> List["BaseTransform"]:
         pass
 
@@ -63,6 +67,7 @@ class LocalOperator(RalfOperator):
         self.transform_object = self.frame.transform_object
         self.children = children
         self.scheduler = frame.scheduler
+        self.scheduler._operator = self # set operator for scheduler
         self.context = context
         self.config = ralf_config
 
@@ -165,6 +170,9 @@ class LocalOperator(RalfOperator):
         for record in records:
             self.scheduler.push_event(record)
 
+    def get(self, key): 
+        return self.transform_object.get(key)
+
     def dump_transform_state(self) -> List["BaseTransform"]:
         return [self.transform_object]
 
@@ -258,8 +266,13 @@ class RayOperator(RalfOperator):
                 ]
             else:
                 raise Exception(f"Can't enqueue_events for event type {record.type_}")
+
+        # send records to actors
         for handle, replica_records in actor_map.items():
             handle.local_handle_events.remote(replica_records)
+
+    def get(self, key): 
+       return self.pool.choose_actor(key).get.remote(key)
 
     def dump_transform_state(self) -> List["BaseTransform"]:
         return sum(
