@@ -29,6 +29,11 @@ class BaseScheduler(ABC):
     """
 
     event_class: Type[WakerProtocol] = threading.Event
+    _operator = None
+
+    def get(self, key): 
+        assert self._operator is not None, f"Operator not set {self._operator}"
+        return self._operator.get(key)
 
     def wake_waiter_if_needed(self):
         if self.waker is not None:
@@ -83,6 +88,7 @@ class FIFO(BaseScheduler):
     def pop_event(self) -> Record:
         if len(self.queue) == 0:
             return Record.make_wait_event(self.new_waker())
+
         return self.queue.pop(0)
 
     def qsize(self) -> int:
