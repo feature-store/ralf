@@ -120,6 +120,7 @@ class LocalOperator(RalfOperator):
                             or not next_event.is_wait_event()
                         )
 
+            metrics_connection.observe("queue_size", self.scheduler.qsize())
             try:
                 # Process the record
                 if isinstance(next_event, list) or next_event.is_data():

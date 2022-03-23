@@ -48,6 +48,10 @@ class BaseScheduler(ABC):
     def pop_event(self) -> Record:
         pass
 
+    @abstractmethod
+    def qsize(self) -> int:
+        pass
+
     def __repr__(self):
         return self.__class__.__name__
 
@@ -81,6 +85,9 @@ class FIFO(BaseScheduler):
             return Record.make_wait_event(self.new_waker())
         return self.queue.pop(0)
 
+    def qsize(self) -> int:
+        return len(self.queue)
+
 
 class LIFO(BaseScheduler):
     def __init__(self) -> None:
@@ -100,6 +107,9 @@ class LIFO(BaseScheduler):
         if len(self.queue) == 0:
             return Record.make_wait_event(self.new_waker())
         return self.queue.pop(-1)
+
+    def qsize(self) -> int:
+        return len(self.queue)
 
 
 @total_ordering
@@ -267,6 +277,9 @@ class SourceScheduler(BaseScheduler):
 
     def pop_event(self) -> Record:
         return Record(DummyEntry())
+
+    def qsize(self) -> int:
+        return 0
 
 
 # TODO(simon): scheduler ideas
