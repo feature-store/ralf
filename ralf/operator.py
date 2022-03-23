@@ -6,7 +6,6 @@ from abc import ABC, abstractmethod
 from collections import OrderedDict, defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from queue import PriorityQueue
-
 from typing import Callable, List, Optional
 
 import psutil
@@ -15,9 +14,9 @@ from ray.actor import ActorHandle
 
 from ralf.policies import load_shedding_policy, processing_policy
 from ralf.record import Record, Schema
-from ralf.state.table_state import TableState
 from ralf.state.connector import Connector
 from ralf.state.dict_connector import DictConnector
+from ralf.state.table_state import TableState
 
 DEFAULT_STATE_CACHE_SIZE: int = 0
 
@@ -223,9 +222,9 @@ class Operator(ABC):
 
     async def _on_record(self, record: Record):
         """
-        Create an event and add it to the queue when a record is recieved. 
+        Create an event and add it to the queue when a record is recieved.
 
-        :record: Update record to process 
+        :record: Update record to process
         """
         event = Event(
             lambda: self._on_record_helper(record), record, self._processing_policy

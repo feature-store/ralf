@@ -5,11 +5,11 @@ import pytest
 import ray
 from ray.util.queue import Empty, Queue
 
-from ralf.policies.base import PrioritizationPolicy
 from ralf.core import Ralf
 from ralf.operator import DEFAULT_STATE_CACHE_SIZE, Operator
 from ralf.operators.source import Source
 from ralf.policies import load_shedding_policy, processing_policy
+from ralf.policies.base import PrioritizationPolicy
 from ralf.record import Record, Schema
 from ralf.table import Table
 
@@ -78,7 +78,9 @@ def test_mapper():
     queue = Queue()
     # send 1 to 100
     source_table = Table([], CounterSource, 100)
-    sink = source_table.map(Sink, queue, schema=Schema("key", {"key": str, "value": int}))
+    sink = source_table.map(
+        Sink, queue, schema=Schema("key", {"key": str, "value": int})
+    )
 
     ralf.deploy(source_table, "source")
     ralf.deploy(sink, "sink")

@@ -115,7 +115,10 @@ class LocalOperator(RalfOperator):
                     with time_and_count("wait_pop_event"):
                         next_event.wait()
                         next_event = self.scheduler.pop_event()
-                        assert isinstance(next_event, list) or not next_event.is_wait_event()
+                        assert (
+                            isinstance(next_event, list)
+                            or not next_event.is_wait_event()
+                        )
 
             try:
                 # Process the record
@@ -237,7 +240,8 @@ class RayOperator(RalfOperator):
         self.children = children
 
     def _check_sharding_key_exist_if_necessary(self, records: List[Record]):
-        if len(records) == 0: return 
+        if len(records) == 0:
+            return
         r = records[0]
         if r.is_data() and len(self.pool.handles) > 1:
             assert (

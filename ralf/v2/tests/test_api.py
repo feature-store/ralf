@@ -25,7 +25,11 @@ class CounterSource(BaseTransform):
         if self.count >= self.up_to:
             logger.msg("self.count reached to self.up_to, sending StopIteration")
             raise StopIteration()
-        return Record(id_=record.id_, entry=IntValue(value=self.count), shard_key=str(self.count % 10))
+        return Record(
+            id_=record.id_,
+            entry=IntValue(value=self.count),
+            shard_key=str(self.count % 10),
+        )
 
 
 class Sum(BaseTransform):

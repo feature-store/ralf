@@ -110,7 +110,6 @@ class FeatureFrame:
 class RalfApplication:
     """An end to end feature processing pipeline in Ralf."""
 
-
     def __init__(self, config: RalfConfig):
         self.config = config
         self.manager: RalfManager = self.config.get_manager_cls()(self.config)

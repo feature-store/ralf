@@ -1,10 +1,10 @@
-from ralf.v2 import LIFO, FIFO, BaseTransform, RalfApplication, RalfConfig, Record, BaseScheduler
-from ralf.v2.operator import OperatorConfig, SimpyOperatorConfig, RayOperatorConfig
 import time
-
-from typing import List
 from collections import defaultdict
 from dataclasses import dataclass
+from typing import List
+
+from ralf.v2 import BaseTransform, RalfApplication, RalfConfig, Record
+from ralf.v2.operator import OperatorConfig, RayOperatorConfig
 
 
 @dataclass
@@ -13,10 +13,12 @@ class SourceValue:
     value: int
     timestamp: float
 
+
 @dataclass
 class SumValue:
     key: str
-    value: int  
+    value: int
+
 
 class FakeSource(BaseTransform):
     def __init__(self, total: int) -> None:
@@ -26,7 +28,7 @@ class FakeSource(BaseTransform):
 
     def on_event(self, _: Record) -> List[Record[SourceValue]]:
 
-        if self.count >= self.total: 
+        if self.count >= self.total:
             print("completed iteration")
             raise StopIteration()
 
@@ -41,27 +43,30 @@ class FakeSource(BaseTransform):
             Record(
                 entry=SourceValue(
                     key=key,
-                    value=self.count, 
-                    timestamp=time.time(), 
-                ), 
-                shard_key=key # key to shard/query 
+                    value=self.count,
+                    timestamp=time.time(),
+                ),
+                shard_key=key,  # key to shard/query
             )
         ]
 
-class Sum(BaseTransform):
 
-    def __init__(self): 
+class Sum(BaseTransform):
+    def __init__(self):
         self.total = defaultdict(lambda: 0)
 
     def on_event(self, record: Record) -> Record[SumValue]:
         self.total[record.entry.key] += record.entry.value
         print(f"Record {record.entry.key}, value {self.total[record.entry.key]}")
-        return Record(entry=SumValue(key=record.entry.key, value=self.total[record.entry.key]))
+        return Record(
+            entry=SumValue(key=record.entry.key, value=self.total[record.entry.key])
+        )
+
 
 if __name__ == "__main__":
 
     deploy_mode = "ray"
-    #deploy_mode = "local"
+    # deploy_mode = "local"
     app = RalfApplication(RalfConfig(deploy_mode=deploy_mode))
 
     source_ff = app.source(

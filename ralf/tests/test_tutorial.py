@@ -21,11 +21,11 @@ from collections import defaultdict
 import numpy as np
 import pandas as pd
 
-from ralf.policies.base import LoadSheddingPolicy
-from ralf.operators.source import SourceOperator
-from ralf.operator import Operator
-from ralf.core import Ralf 
 from ralf.client import RalfClient
+from ralf.core import Ralf
+from ralf.operator import Operator
+from ralf.operators.source import SourceOperator
+from ralf.policies.base import LoadSheddingPolicy
 from ralf.record import Record, Schema
 
 ralf_server = Ralf()
