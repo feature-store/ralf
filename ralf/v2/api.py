@@ -66,11 +66,14 @@ class BaseTransform:
         """
         raise NotImplementedError("To be implemented by subclass.")
 
+    def prepare(self):
+        pass
+
     def __repr__(self):
         return self.__class__.__name__
 
-    def get(self, key): 
-        """Get current feature value for key. Returns null by default. 
+    def get(self, key):
+        """Get current feature value for key. Returns null by default.
 
         :param key: key to lookup feature value
         :type key: str
