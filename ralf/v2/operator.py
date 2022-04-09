@@ -145,6 +145,7 @@ class LocalOperator(RalfOperator):
 
                 # If this operator got StopIteration, it should exit
                 elif next_event.is_stop_iteration():
+                    self.transform_object.on_stop(next_event)
                     raise StopIteration()
 
                 else:
