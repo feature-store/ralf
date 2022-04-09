@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Deque, Dict, Iterable, List, Optional, Type, Union
 
 from typing_extensions import Literal
+from ralf.v2.table_state import TableState
 
 from ralf.v2.manager import LocalManager, RalfManager, RayManager, SimpyManager
 from ralf.v2.operator import OperatorConfig
@@ -85,16 +86,19 @@ class FeatureFrame:
         self,
         transform_object: BaseTransform,
         scheduler: BaseScheduler = FIFO(),
+        table_state: TableState = None,
         operator_config: OperatorConfig = OperatorConfig(),
     ):
         self.transform_object = transform_object
         self.scheduler = scheduler
+        self.table_state = table_state
         self.config = operator_config
         self.children: List["FeatureFrame"] = []
         logger.msg(
             "Created FeatureFrame",
             transform=transform_object,
             scheduler=scheduler,
+            table_state=table_state,
             config=operator_config
             if operator_config != OperatorConfig()
             else "default",
@@ -104,10 +108,11 @@ class FeatureFrame:
         self,
         transform_object: BaseTransform,
         scheduler: BaseScheduler = FIFO(),
+        table_state: TableState = None,
         operator_config: OperatorConfig = OperatorConfig(),
     ) -> "FeatureFrame":
         """Apply a transformation to this feature frame, with scheduler."""
-        frame = FeatureFrame(transform_object, scheduler, operator_config)
+        frame = FeatureFrame(transform_object, scheduler, table_state, operator_config)
         self.children.append(frame)
         return frame
 
