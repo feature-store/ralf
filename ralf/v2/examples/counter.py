@@ -66,8 +66,8 @@ class Sum(BaseTransform):
         )
 
 class UpdateDict(BaseTransform):
-    def __init__(self, table_state: TableState):
-        self.table_state = table_state
+    def __init__(self):
+        self.count = 0
 
     def on_event(self, record: Record) -> None:
         print("single update table", self.table_state.connector.tables)
@@ -75,11 +75,10 @@ class UpdateDict(BaseTransform):
         return None
     
 class BatchUpdate(BaseTransform):
-    def __init__(self, table_state:TableState ,batch_size: int):
+    def __init__(self ,batch_size: int):
         self.batch_size = batch_size
         self.count = 0
         self.records = []
-        self.table_state = table_state
 
     def on_event(self, record: Record) -> None:
         self.records.append(record)
@@ -118,25 +117,27 @@ if __name__ == "__main__":
 
     dict_schema = Schema("key", {"key": str, "value": int})
     dict_schema_1 = Schema("key", {"key": str, "value": int})
-
+    dict_schema.name = "single"
+    dict_schema_1.name = "batch"
     dict_conn = DictConnector()
-    dict_conn_1 = DictConnector()
 
     dict_table_state = TableState(dict_schema, dict_conn)
-    batch_table_state = TableState(dict_schema_1, dict_conn_1)
+    batch_table_state = TableState(dict_schema_1, dict_conn)
 
     update_ff = sum_ff.transform(
-        UpdateDict(dict_table_state),
+        UpdateDict(),
         operator_config=OperatorConfig(
             ray_config=RayOperatorConfig(num_replicas=1),
         ),
+        table_state=dict_table_state
     )
 
     batch_update_ff = sum_ff.transform(
-        BatchUpdate(batch_table_state, 3),
+        BatchUpdate(3),
         operator_config=OperatorConfig(
             ray_config=RayOperatorConfig(num_replicas=1),
         ),
+        table_state=batch_table_state
     )
 
     app.deploy()

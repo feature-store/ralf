@@ -92,6 +92,10 @@ class FeatureFrame:
         self.transform_object = transform_object
         self.scheduler = scheduler
         self.table_state = table_state
+        # Adding component's access to each other's states in the feature frame
+        self.transform_object.table_state = table_state
+        self.transform_object.scheduler = scheduler
+        self.scheduler.table_state = table_state
         self.config = operator_config
         self.children: List["FeatureFrame"] = []
         logger.msg(

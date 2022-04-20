@@ -9,7 +9,7 @@ class DictConnector(Connector):
         self.tables = dict()
 
     def add_table(self, schema: Schema):
-        self.tables[schema.get_name()] = dict()
+        self.tables[schema.name] = dict()
 
     def get_records(self, schema: Schema) -> Dict:
         return self.tables[schema.get_name()]
