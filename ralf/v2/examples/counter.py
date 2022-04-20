@@ -2,7 +2,7 @@ import time
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import List
-from ralf.v2.dict_connector import DictConnector
+from ralf.v2.connectors.dict_connector import DictConnector
 from ralf.v2.record import Schema
 from ralf.v2.table_state import TableState
 
