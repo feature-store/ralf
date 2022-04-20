@@ -4,7 +4,7 @@ from typing import List, Union
 import redis
 
 from ralf.v2.record import Record, Schema
-from ralf.v2.connector import Connector
+from ralf.v2.connectors.connector import Connector
 
 
 class RedisConnector(Connector):

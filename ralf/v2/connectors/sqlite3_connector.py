@@ -3,7 +3,7 @@ import sqlite3
 from typing import List, Union
 
 from ralf.v2.record import Record, Schema
-from ralf.v2.connector import Connector
+from ralf.v2.connectors.connector import Connector
 
 sql_types = {int: "INTEGER", str: "TEXT", float: "REAL"}
 
