@@ -8,31 +8,39 @@ from ralf.v2.connector import Connector
 
 
 class RedisConnector(Connector):
-    def __init__(self, conn: redis.client.Redis):
-        self.conn = conn
+    def __init__(self, host: str, port: str, password: str):
+        self.host = host
+        self.port = port
+        self.password = password
+
+    def get_conn(self):
+        return redis.Redis(host=self.host, port=self.port, password=self.password)
 
     def add_table(self, schema: Schema):
         pass
 
     def update(self, schema: Schema, record: Record):
-        key = getattr(record, schema.primary_key)
-        pickled_record = pickle.dumps(record)
+        key = getattr(record.entry, schema.primary_key)
+        pickled_record = Record.serialize(record)
         self.conn.hset(schema.get_name(), key, pickled_record)
 
     def delete(self, schema: Schema, key: str):
         self.conn.hdel(schema.get_name(), key)
 
-    def get_one(self, schema: Schema, key) -> Union[Record, None]:
+    def get_one(self, schema: Schema, key, dataclass) -> Union[Record, None]:
         val = self.conn.hget(schema.get_name(), key)
         if val:
-            return pickle.loads(val)
+            return Record.deserialize(val, dataclass)
         return None
 
-    def get_all(self, schema: Schema) -> List[Record]:
+    def get_all(self, schema: Schema, dataclass) -> List[Record]:
         values = self.conn.hvals(schema.get_name())
-        records = [pickle.loads(val) for val in values]
-        return sorted(records, key=lambda r: r.processing_time)
+        records = [Record.deserialize(val, dataclass) for val in values]
+        return sorted(records, key=lambda r: r.entry.timestamp)
 
     def count(self, schema: Schema) -> int:
         num_records = self.conn.hlen(schema.get_name())
         return num_records
+
+    def prepare(self):
+        self.conn = redis.Redis(host=self.host, port=self.port, password=self.password)

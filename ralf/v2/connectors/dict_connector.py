@@ -24,16 +24,19 @@ class DictConnector(Connector):
         if key in records:
             records.pop(key, None)
 
-    def get_one(self, schema: Schema, key) -> Union[Record, None]:
+    def get_one(self, schema: Schema, key, _) -> Union[Record, None]:
         records = self.get_records(schema)
         if key in records:
             return records[key]
         return None
 
-    def get_all(self, schema: Schema) -> List[Record]:
+    def get_all(self, schema: Schema, _) -> List[Record]:
         records = self.get_records(schema)
         return list(records.values())
 
     def count(self, schema: Schema) -> int:
         records = self.get_records(schema)
         return len(records.items())
+    
+    def prepare(self) -> None:
+        pass

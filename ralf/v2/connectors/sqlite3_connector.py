@@ -1,4 +1,3 @@
-import pickle
 import sqlite3
 from typing import List, Union
 
@@ -20,7 +19,12 @@ class SQLConnector(Connector):
         self.dbname = dbname
 
     def add_table(self, schema: Schema):
-        conn = sqlite3.connect(self.dbname)
+        # conn = sqlite3.connect(self.dbname)
+        conn = None
+        if hasattr(self, "conn"):
+            conn = self.conn
+        else:
+            conn = sqlite3.connect(self.dbname)
         table_name = schema.get_name()
         curr = conn.cursor()
         if schema.columns[schema.primary_key] not in sql_types:
@@ -31,47 +35,50 @@ class SQLConnector(Connector):
         conn.commit()
 
     def update(self, schema: Schema, record: Record):
-        conn = sqlite3.connect(self.dbname)
-        curr = conn.cursor()
+        # conn = sqlite3.connect(self.dbname)
+        curr = self.conn.cursor()
         table_name = schema.get_name()
-        pickled_record = pickle.dumps(record)
-        delete_statement = f"DELETE FROM {table_name} WHERE key = {record.key}"
+        pickled_record = Record.serialize(record)
+        delete_statement = f"DELETE FROM {table_name} WHERE key = {record.entry.key}"
         insert_statement = (
-            f"INSERT INTO {table_name} (key, record) VALUES ({record.key}, ?)"
+            f"INSERT INTO {table_name} (key, record) VALUES ({record.entry.key}, ?)"
         )
         curr.execute(delete_statement)
         curr.execute(insert_statement, (pickled_record,))
-        conn.commit()
+        self.conn.commit()
 
     def delete(self, schema: Schema, key: str):
-        conn = sqlite3.connect(self.dbname)
-        curr = conn.cursor()
+        # conn = sqlite3.connect(self.dbname)
+        curr = self.conn.cursor()
         table_name = schema.get_name()
         curr.execute(f"DELETE FROM {table_name} WHERE {schema.primary_key} = {key}")
-        conn.commit()
+        self.conn.commit()
 
-    def get_one(self, schema: Schema, key: str) -> Union[Record, None]:
-        conn = sqlite3.connect(self.dbname)
-        curr = conn.cursor()
+    def get_one(self, schema: Schema, key: str, dataclass) -> Union[Record, None]:
+        # conn = sqlite3.connect(self.dbname)
+        curr = self.conn.cursor()
         table_name = schema.get_name()
         select_statement = f"SELECT record FROM {table_name} WHERE {schema.primary_key} = {key} ORDER BY rowid DESC"
         row = curr.execute(select_statement).fetchone()
         record = None
         if row:
-            record = pickle.loads(row[0])
+            record = Record.deserialize(row[0], dataclass)
         return record
 
-    def get_all(self, schema: Schema) -> List[Record]:
-        conn = sqlite3.connect(self.dbname)
-        curr = conn.cursor()
+    def get_all(self, schema: Schema, dataclass) -> List[Record]:
+        # conn = sqlite3.connect(self.dbname) 
+        curr = self.conn.cursor()
         table_name = schema.get_name()
         rows = curr.execute(f"SELECT record FROM {table_name}").fetchall()
-        records = [pickle.loads(i[0]) for i in rows]
-        return records
+        records = [Record.deserialize(i[0], dataclass) for i in rows]
+        return sorted(records, key=lambda r: r.entry.timestamp)
 
     def count(self, schema: Schema) -> int:
-        conn = sqlite3.connect(self.dbname)
-        curr = conn.cursor()
+        # conn = sqlite3.connect(self.dbname)
+        curr = self.conn.cursor()
         table_name = schema.get_name()
         count = curr.execute(f"SELECT COUNT(rowid) FROM {table_name}").fetchone()[0]
         return count
+
+    def prepare(self):
+        self.conn = sqlite3.connect(self.dbname)

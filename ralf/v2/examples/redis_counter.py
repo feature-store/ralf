@@ -84,15 +84,18 @@ class Sum(BaseTransform):
             entry=src_val
         )
 
-class UpdateDict(BaseTransform):
+class UpdateRedis(BaseTransform):
     def __init__(self, table_state: TableState):
         self.table_state = table_state
 
     def on_event(self, record: Record) -> None:
         # print("single update table", self.table_state.connector.tables)
-        self.table_state.update(record)
-        print("query result!: ", self.table_state.point_query(record.entry.key))
+        self.table_state.update(record, self.conn)
+        print("query result!: ", self.table_state.point_query(record.entry.key, self.conn))
         return None
+
+    def prepare(self):
+        self.conn = self.table_state.connector.get_conn()
     
 class BatchUpdate(BaseTransform):
     def __init__(self, table_state: TableState ,batch_size: int):
@@ -109,11 +112,14 @@ class BatchUpdate(BaseTransform):
             self.count = 0
             for r in self.records:
                 print(f"batch update, processing {r}")
-                self.table_state.update(r)
+                self.table_state.update(r, self.conn)
             self.records = []
             # print("batch table", self.table_state.connector.tables)
         
         return None
+
+    def prepare(self):
+        self.conn = redis.Redis(host='127.0.0.1', port='6379', password='')
 
 
 if __name__ == "__main__":
@@ -142,11 +148,11 @@ if __name__ == "__main__":
     redis_conn = RedisConnector(host='127.0.0.1', port='6379', password='')
     redis_conn_1 = RedisConnector(host='127.0.0.1', port='6379', password='')
 
-    dict_table_state = TableState(dict_schema, redis_conn, SourceValue)
+    redis_table_state = TableState(dict_schema, redis_conn, SourceValue)
     batch_table_state = TableState(dict_schema_1, redis_conn_1, SourceValue)
 
     update_ff = sum_ff.transform(
-        UpdateDict(dict_table_state),
+        UpdateRedis(redis_table_state),
         operator_config=OperatorConfig(
             ray_config=RayOperatorConfig(num_replicas=1),
         ),
