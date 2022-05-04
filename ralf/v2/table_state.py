@@ -34,7 +34,8 @@ class TableState:
         t1 = time.time()
         self.connector.update(self.schema, record)
         t2 = time.time()
-
+        print('update')
+        print("table: ", self.connector.tables)
         self.times["update"] += (t2-t1)
         self.counts["update"] += 1
         self.num_updates += 1
@@ -43,6 +44,8 @@ class TableState:
         t1 = time.time()
         self.connector.delete(self.schema, key)
         t2 = time.time()
+        print('delete')
+        print("table: ", self.connector.tables)
 
         self.times["delete"] += (t2-t1)
         self.counts["delete"] += 1        
@@ -52,7 +55,9 @@ class TableState:
         t1 = time.time()
         val = self.connector.get_one(self.schema, key)
         t2 = time.time()
-        
+        print('read')
+        print("table: ", self.connector.tables)
+
         self.times["point_query"] += (t2-t1)
         self.counts["point_query"] += 1
         if not val:
