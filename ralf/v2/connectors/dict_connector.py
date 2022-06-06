@@ -8,6 +8,9 @@ class DictConnector(Connector):
     def __init__(self):
         self.tables = dict()
 
+    def create_connection(self):
+        return self
+
     def add_table(self, schema: Schema):
         self.tables[schema.get_name()] = dict()
 

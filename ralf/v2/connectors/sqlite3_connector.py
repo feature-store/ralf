@@ -4,6 +4,8 @@ from typing import List, Union
 from ralf.v2.record import Record, Schema
 from ralf.v2.connector import Connector
 
+from dataclasses import dataclass
+
 sql_types = {int: "INTEGER", str: "TEXT", float: "REAL"}
 
 def schema_sql_format(schema: Schema) -> str:
@@ -13,10 +15,22 @@ def schema_sql_format(schema: Schema) -> str:
     query.append("record TEXT")
     return ", ".join(query)
 
+@dataclass
+class SQLConfig:
+    dbname: str
+
+    def get_conn(self):
+        return SQLConnector(dbname=self.dbname)
 
 class SQLConnector(Connector):
     def __init__(self, dbname: str):
         self.dbname = dbname
+    
+    def create_connection(self):
+        # This function will return a new connection
+        # if the connector is such that it cannot be shared
+        # across multiple threads, and it will return self otherwise.
+        return SQLConnector(self.dbname)
 
     def add_table(self, schema: Schema):
         # conn = sqlite3.connect(self.dbname)

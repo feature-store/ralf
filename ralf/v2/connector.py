@@ -10,6 +10,10 @@ class Connector(ABC):
         pass
 
     @abstractmethod
+    def create_connection(self):
+        pass
+
+    @abstractmethod
     def update(self, schema: Schema, record: Record):
         pass
 

@@ -86,7 +86,6 @@ class Record(Generic[T]):
         encoded_dict = pickle.loads(data)
         record = pickle.loads(encoded_dict['data'])
         if 'entry' in encoded_dict:
-            print("encoded dict:", encoded_dict['entry'])
             rec = encoded_dict['entry']
             record.entry = given_class(key=rec['key'], value=rec['value'], timestamp=rec['timestamp']) # was supposed to be given_class.from_dict(...) :(
         return record

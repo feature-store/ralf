@@ -6,12 +6,14 @@ import redis
 from ralf.v2.record import Record, Schema
 from ralf.v2.connector import Connector
 
-
 class RedisConnector(Connector):
     def __init__(self, host: str, port: str, password: str):
         self.host = host
         self.port = port
         self.password = password
+
+    def create_connection(self):
+        return RedisConnector(self.host, self.port, self.password)
 
     def get_conn(self):
         return redis.Redis(host=self.host, port=self.port, password=self.password)

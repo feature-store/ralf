@@ -89,7 +89,8 @@ class LocalOperator(RalfOperator):
             thread="worker",
         )
 
-        self.transform_object.table_state.connector.prepare()
+        if hasattr(self.transform_object, "table_state"):
+            self.transform_object.table_state.connector.prepare()
         self.transform_object.prepare()
         
 

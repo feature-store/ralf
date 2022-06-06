@@ -10,7 +10,7 @@ from ralf.v2.connector import Connector
 class TableState:
     def __init__(self, schema: Schema, connector: Connector, dataclass):
         self.schema = schema
-        self.connector = connector
+        self.connector = connector.create_connection()
         self.connector.add_table(schema)
         self.dataclass = dataclass
 
