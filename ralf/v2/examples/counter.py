@@ -8,6 +8,7 @@ from ralf.v2.table_state import TableState
 
 from ralf.v2 import BaseTransform, RalfApplication, RalfConfig, Record
 from ralf.v2.operator import OperatorConfig, RayOperatorConfig
+from ralf.v2.utils import get_logger
 
 
 @dataclass
@@ -22,6 +23,7 @@ class SumValue:
     key: str
     value: int
 
+logger = get_logger()
 
 class FakeSource(BaseTransform):
     def __init__(self, total: int) -> None:
@@ -68,20 +70,20 @@ class Sum(BaseTransform):
 class UpdateDict(BaseTransform):
     def __init__(self):
         self.count = 0
-        self.table_state = self.getFF().table_state
 
     def on_event(self, record: Record) -> None:
-        print("single update table", self.table_state.connector.tables)
-        self.table_state.update(record)
+        self.update(record)
         return None
     
+    def on_stop(self, record: Record):
+        logger.msg(self.get_all())
+
 class BatchUpdate(BaseTransform):
     def __init__(self, batch_size: int):
         self.batch_size = batch_size
         self.count = 0
         self.records = []
-        self.table_state = self.getFF().table_state
-
+        
     def on_event(self, record: Record) -> None:
         self.records.append(record)
         self.count += 1
@@ -90,11 +92,13 @@ class BatchUpdate(BaseTransform):
             self.count = 0
             for r in self.records:
                 print(f"batch update, processing {r}")
-                self.table_state.update(r)
+                self.update(r)
             self.records = []
-            print("batch table", self.table_state.connector.tables)
         
         return None
+    
+    def on_stop(self, record: Record):
+        logger.msg(self.get_all())
 
 if __name__ == "__main__":
 

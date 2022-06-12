@@ -44,7 +44,7 @@ class TableState:
 
     def point_query(self, key) -> Record:
         t1 = time.time()
-        val = self.connector.get_one(self.schema, key, self.dataclass)
+        val = self.connector.get(self.schema, key, self.dataclass)
         t2 = time.time()
 
         if not val:
@@ -61,3 +61,6 @@ class TableState:
     def recordQuery(self, queryType: String, timeTaken):
         self.times[queryType] += timeTaken
         self.counts[queryType] += 1        
+
+    def prepare(self):
+        self.connector.prepare()

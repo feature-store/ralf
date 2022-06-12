@@ -78,7 +78,7 @@ class LocalOperator(RalfOperator):
         )
 
         logger.msg("Preparing transform object")
-
+        self.frame.prepare()
         self.worker_thread = Thread(target=self._run_forever, daemon=True)
         self.worker_thread.start()
 
@@ -89,10 +89,7 @@ class LocalOperator(RalfOperator):
             thread="worker",
         )
 
-        if hasattr(self.transform_object, "table_state"):
-            self.transform_object.table_state.connector.prepare()
-        self.transform_object.prepare()
-        
+        # self.frame.prepare()        
 
         db_path = f"{self.config.metrics_dir}/{str(self.frame.transform_object)}_{self.context['shard_idx']}.db"
         metrics_connection = event_metrics.MetricConnection(
