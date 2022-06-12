@@ -310,7 +310,9 @@ class _SimpySink(RalfOperator):
 
     def dump_transform_state(self):
         return self.recordings
-
+    
+    def get(self, key):
+        pass
 
 class SimpyOperator(RalfOperator):
     """Skip running transform, but record the event ordering"""
@@ -377,6 +379,8 @@ class SimpyOperator(RalfOperator):
         for record in records:
             self.scheduler.push_event(record)
 
+    def get(self, key):
+        return self.transform_object.get(key)
 
 @dataclass
 class RayOperatorConfig:
