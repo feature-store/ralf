@@ -78,11 +78,16 @@ class BaseTransform:
         """
         pass
 
-    def prepare(self):
-        pass
-
     def __repr__(self):
         return self.__class__.__name__
+
+    def getFF(self):
+        """Get the feature frame transform is being applied to. 
+        """
+        return self.feature_frame
+
+    def prepare(self):
+        pass
 
     def get(self, key): 
         """Get current feature value for key. 
@@ -92,14 +97,6 @@ class BaseTransform:
         """
         return self.getFF().get(key)
     
-    def getFF(self):
-        """Get the feature frame transform is being applied to. 
-        """
-        return self.feature_frame
-
-    def get(self, key:str):
-        return self.getFF().get(key)
-
     def update(self, record:Record):
         self.getFF().update(record)
 
