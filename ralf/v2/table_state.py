@@ -1,4 +1,5 @@
 from typing import List
+import redis
 
 from ralf.v2.record import Record, Schema
 from ralf.v2.connector import Connector
@@ -7,10 +8,11 @@ from ralf.v2.connector import Connector
 # Maintains table values
 # TODO: This should eventually be a wrapper around a DB connection
 class TableState:
-    def __init__(self, schema: Schema, connector: Connector):
+    def __init__(self, schema: Schema, connector: Connector, dataclass):
         self.schema = schema
-        self.connector = connector
+        self.connector = connector.create_connection()
         self.connector.add_table(schema)
+        self.dataclass = dataclass
 
         self.num_updates: int = 0
         self.num_deletes: int = 0
@@ -34,13 +36,14 @@ class TableState:
         self.num_deletes += 1
 
     def point_query(self, key) -> Record:
-        val = self.connector.get_one(self.schema, key)
+        val = self.connector.get_one(self.schema, key, self.dataclass)
         if not val:
             raise KeyError(f"Key {key} not found.")
         return val
 
     def bulk_query(self) -> List[Record]:
-        return self.connector.get_all(self.schema)
+        print(self.schema, self.dataclass)
+        return self.connector.get_all(self.schema, self.dataclass)
 
     def get_schema(self) -> Schema:
         return self.schema

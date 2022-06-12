@@ -89,7 +89,10 @@ class LocalOperator(RalfOperator):
             thread="worker",
         )
 
+        if hasattr(self.transform_object, "table_state"):
+            self.transform_object.table_state.connector.prepare()
         self.transform_object.prepare()
+        
 
         db_path = f"{self.config.metrics_dir}/{str(self.frame.transform_object)}_{self.context['shard_idx']}.db"
         metrics_connection = event_metrics.MetricConnection(
