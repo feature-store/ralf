@@ -192,6 +192,8 @@ class LeastUpdate(BaseScheduler):
         heapq.heappush(self.queue, least_updated)
         return record
 
+    def qsize(self) -> int:
+        return len(self.queue)
 
 @dataclass
 class DummyEntry:
