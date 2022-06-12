@@ -10,6 +10,10 @@ class Connector(ABC):
         pass
 
     @abstractmethod
+    def create_connection(self):
+        pass
+
+    @abstractmethod
     def update(self, schema: Schema, record: Record):
         pass
 
@@ -18,13 +22,17 @@ class Connector(ABC):
         pass
 
     @abstractmethod
-    def get(self, schema: Schema, key: str) -> Union[Record, None]:
+    def get(self, schema: Schema, key: str, dataclass) -> Union[Record, None]:
         pass
 
     @abstractmethod
-    def get_all(self, schema: Schema) -> List[Record]:
+    def get_all(self, schema: Schema, dataclass) -> List[Record]:
         pass
 
     @abstractmethod
     def count(self, schema: Schema) -> int:
+        pass
+
+    @abstractmethod
+    def prepare(self) -> None:
         pass

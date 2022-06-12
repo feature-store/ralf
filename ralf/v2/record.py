@@ -1,6 +1,7 @@
 import enum
 import threading
 import json
+import pickle
 from string import ascii_lowercase
 from dataclasses import dataclass, is_dataclass, asdict
 from time import time_ns
@@ -58,6 +59,37 @@ class Record(Generic[T]):
     @staticmethod
     def make_wait_event(event: threading.Event):
         return Record(event, type_=RecordType.WAIT_EVENT)
+
+    @staticmethod
+    def serialize(self):
+        if not is_dataclass(self.entry):
+            encoded_dict = {
+                'data': pickle.dumps(self),
+            }
+            return pickle.dumps(encoded_dict) 
+        else:
+            # Temporarily storing entry so we can
+            # null it and serialize object.
+            # I wonder how much extra overhead this creates...
+            entry = self.entry
+            self.entry = None
+            serialized_dict = {'key': entry.key, 'value': entry.value, 'timestamp': entry.timestamp}
+            encoded_dict = {
+                'entry': serialized_dict, # was supposed to be asdict(entry), or entry.to_dict() :(
+                'data': pickle.dumps(self),
+            }
+            self.entry = entry
+            return pickle.dumps(encoded_dict)
+    
+    @staticmethod
+    def deserialize(data, given_class):
+        encoded_dict = pickle.loads(data)
+        record = pickle.loads(encoded_dict['data'])
+        if 'entry' in encoded_dict:
+            rec = encoded_dict['entry']
+            record.entry = given_class(key=rec['key'], value=rec['value'], timestamp=rec['timestamp']) # was supposed to be given_class.from_dict(...) :(
+        return record
+
 
     def is_data(self) -> bool:
         return is_dataclass(self.entry)

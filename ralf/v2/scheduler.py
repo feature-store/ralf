@@ -41,7 +41,7 @@ class BaseScheduler(ABC):
             self.waker = None
 
     def new_waker(self):
-        assert self.waker is None
+        # assert self.waker is None
         self.waker = self.event_class()
         return self.waker
 

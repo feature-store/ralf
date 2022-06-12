@@ -1,7 +1,7 @@
 from typing import List
 
-from ralf.record import Record, Schema
-from ralf.state.connector import Connector
+from ralf.v2.record import Record, Schema
+from ralf.v2.connector import Connector
 
 
 # Maintains table values

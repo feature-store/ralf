@@ -67,7 +67,7 @@ class LocalOperator(RalfOperator):
         self.transform_object = self.frame.transform_object
         self.children = children
         self.scheduler = frame.scheduler
-        self.scheduler._operator = self # set operator for scheduler
+        self.scheduler._operator = self  # set operator for scheduler
         self.context = context
         self.config = ralf_config
 
@@ -76,6 +76,8 @@ class LocalOperator(RalfOperator):
             context=self.context,
             thread="main",
         )
+
+        logger.msg("Preparing transform object")
 
         self.worker_thread = Thread(target=self._run_forever, daemon=True)
         self.worker_thread.start()
@@ -86,6 +88,11 @@ class LocalOperator(RalfOperator):
             context=self.context,
             thread="worker",
         )
+
+        if hasattr(self.transform_object, "table_state"):
+            self.transform_object.table_state.connector.prepare()
+        self.transform_object.prepare()
+        
 
         db_path = f"{self.config.metrics_dir}/{str(self.frame.transform_object)}_{self.context['shard_idx']}.db"
         metrics_connection = event_metrics.MetricConnection(
@@ -106,10 +113,10 @@ class LocalOperator(RalfOperator):
             start_ns = time.time_ns()
             yield
             duration_ns = time.time_ns() - start_ns
-            metrics_connection.observe(
-                f"{metric_name}_duration_ns", duration_ns, labels=labels
-            )
-            metrics_connection.increment(f"{metric_name}_counter", labels=labels)
+            # metrics_connection.observe(
+            #     f"{metric_name}_duration_ns", duration_ns, labels=labels
+            # )
+            # metrics_connection.increment(f"{metric_name}_counter", labels=labels)
 
         while True:
             with time_and_count("pop_event"):
@@ -175,7 +182,7 @@ class LocalOperator(RalfOperator):
         for record in records:
             self.scheduler.push_event(record)
 
-    def get(self, key): 
+    def get(self, key):
         return self.transform_object.get(key)
 
     def dump_transform_state(self) -> List["BaseTransform"]:
@@ -277,8 +284,8 @@ class RayOperator(RalfOperator):
         for handle, replica_records in actor_map.items():
             handle.local_handle_events.remote(replica_records)
 
-    def get(self, key): 
-       return self.pool.choose_actor(key).get.remote(key)
+    def get(self, key):
+        return self.pool.choose_actor(key).get.remote(key)
 
     def dump_transform_state(self) -> List["BaseTransform"]:
         return sum(

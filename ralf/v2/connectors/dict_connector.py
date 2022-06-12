@@ -8,8 +8,11 @@ class DictConnector(Connector):
     def __init__(self):
         self.tables = dict()
 
+    def create_connection(self):
+        return self
+
     def add_table(self, schema: Schema):
-        self.tables[schema.name] = dict()
+        self.tables[schema.get_name()] = dict()
 
     def get_records(self, schema: Schema) -> Dict:
         return self.tables[schema.get_name()]
@@ -24,16 +27,19 @@ class DictConnector(Connector):
         if key in records:
             records.pop(key, None)
 
-    def get(self, schema: Schema, key) -> Union[Record, None]:
+    def get(self, schema: Schema, key, _) -> Union[Record, None]:
         records = self.get_records(schema)
         if key in records:
             return records[key]
         return None
 
-    def get_all(self, schema: Schema) -> List[Record]:
+    def get_all(self, schema: Schema, _) -> List[Record]:
         records = self.get_records(schema)
         return list(records.values())
 
     def count(self, schema: Schema) -> int:
         records = self.get_records(schema)
         return len(records.items())
+    
+    def prepare(self) -> None:
+        pass

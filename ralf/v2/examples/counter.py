@@ -2,7 +2,7 @@ import time
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import List
-from ralf.v2.dict_connector import DictConnector
+from ralf.v2.connectors.dict_connector import DictConnector
 from ralf.v2.record import Schema
 from ralf.v2.table_state import TableState
 
@@ -68,6 +68,7 @@ class Sum(BaseTransform):
 class UpdateDict(BaseTransform):
     def __init__(self):
         self.count = 0
+        self.table_state = self.getFF().table_state
 
     def on_event(self, record: Record) -> None:
         print("single update table", self.table_state.connector.tables)
@@ -75,10 +76,11 @@ class UpdateDict(BaseTransform):
         return None
     
 class BatchUpdate(BaseTransform):
-    def __init__(self ,batch_size: int):
+    def __init__(self, batch_size: int):
         self.batch_size = batch_size
         self.count = 0
         self.records = []
+        self.table_state = self.getFF().table_state
 
     def on_event(self, record: Record) -> None:
         self.records.append(record)
@@ -93,7 +95,6 @@ class BatchUpdate(BaseTransform):
             print("batch table", self.table_state.connector.tables)
         
         return None
-
 
 if __name__ == "__main__":
 
@@ -120,9 +121,10 @@ if __name__ == "__main__":
     dict_schema.name = "single"
     dict_schema_1.name = "batch"
     dict_conn = DictConnector()
+    dict_conn_1 = DictConnector()
 
-    dict_table_state = TableState(dict_schema, dict_conn)
-    batch_table_state = TableState(dict_schema_1, dict_conn)
+    dict_table_state = TableState(dict_schema, dict_conn, dataclass)
+    batch_table_state = TableState(dict_schema_1, dict_conn_1, dataclass)
 
     update_ff = sum_ff.transform(
         UpdateDict(),

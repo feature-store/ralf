@@ -67,6 +67,9 @@ class BaseTransform:
         """
         raise NotImplementedError("To be implemented by subclass.")
 
+    def prepare(self):
+        pass
+
     def __repr__(self):
         return self.__class__.__name__
 
@@ -98,9 +101,8 @@ class FeatureFrame:
         self.scheduler = scheduler
         self.table_state = table_state
         
-        # Adding component's access to each other's states in the feature frame
+        # Adding component's access to this feature frame's resources
         self.transform_object.feature_frame = self
-
         self.scheduler.feature_frame = self
         
         self.config = operator_config
