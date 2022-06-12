@@ -53,7 +53,7 @@ class TableState:
 
     def point_query(self, key) -> Record:
         t1 = time.time()
-        val = self.connector.get_one(self.schema, key)
+        val = self.connector.get(self.schema, key)
         t2 = time.time()
         print('read')
         print("table: ", self.connector.tables)

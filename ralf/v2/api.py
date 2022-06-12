@@ -71,12 +71,17 @@ class BaseTransform:
         return self.__class__.__name__
 
     def get(self, key): 
-        """Get current feature value for key. Returns null by default. 
+        """Get current feature value for key. 
 
         :param key: key to lookup feature value
         :type key: str
         """
-        return None
+        return self.getFF().get(key)
+    
+    def getFF(self):
+        """Get the feature frame transform is being applied to. 
+        """
+        return self.feature_frame
 
 
 class FeatureFrame:
@@ -92,12 +97,17 @@ class FeatureFrame:
         self.transform_object = transform_object
         self.scheduler = scheduler
         self.table_state = table_state
+        
         # Adding component's access to each other's states in the feature frame
-        self.transform_object.table_state = table_state
-        self.transform_object.scheduler = scheduler
-        self.scheduler.table_state = table_state
+        self.transform_object.feature_frame = self
+
+        self.scheduler.feature_frame = self
+        
         self.config = operator_config
-        self.children: List["FeatureFrame"] = []
+        
+        self.children: List["FeatureFrame"] = []        
+        self.parent: "FeatureFrame" = None
+
         logger.msg(
             "Created FeatureFrame",
             transform=transform_object,
@@ -118,11 +128,22 @@ class FeatureFrame:
         """Apply a transformation to this feature frame, with scheduler."""
         frame = FeatureFrame(transform_object, scheduler, table_state, operator_config)
         self.children.append(frame)
+        frame.parent = self
         return frame
 
     def __repr__(self) -> str:
         return f"FeatureFrame({repr(self.transform_object)})"
 
+    def get(self, key:str):
+        return self.table_state.point_query(key)
+
+    def update(self, record:Record):
+        self.table_state.update(record)
+
+    def delete(self, key:str):
+        self.table_state.delete(key)
+
+    #TODO: Interface to be able to query feature frame 
 
 class RalfApplication:
     """An end to end feature processing pipeline in Ralf."""

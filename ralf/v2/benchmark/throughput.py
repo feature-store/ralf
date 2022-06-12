@@ -10,9 +10,7 @@ from ralf.v2.table_state import TableState
 
 from ralf.v2 import BaseTransform, RalfApplication, RalfConfig, Record
 from ralf.v2.operator import OperatorConfig, RayOperatorConfig
-from ralf.v2.utils import get_logger
 
-logger = get_logger()
 
 @dataclass
 class SourceValue:
@@ -20,7 +18,7 @@ class SourceValue:
     value: int
     timestamp: float
 
-LOAD = 10
+LOAD = 100
 
 class FakeSource(BaseTransform):
     def __init__(self, total: int) -> None:
@@ -52,42 +50,42 @@ class FakeSource(BaseTransform):
             )
         ]
 
-#write/update
+
 class AddOne(BaseTransform):
-    def on_event(self, record: Record) -> Record:
+    def on_event(self, record: Record) -> None:
         record.entry.value += 1
-        self.getFF().update(record)
-        return record
+        self.table_state.update(record)
+        return None
     
     def on_stop(self, record:Record) -> Record:
-        avg = self.getFF().table_state.times["update"]/self.getFF().table_state.counts["update"]
-        logger.msg(f"AVERAGE UPDATE LATENCY: {avg}")
+        print("average update throughput:" , self.table_state.counts["update"]/self.table_state.times["update"])
         return record
 
 class ReadFromDict(BaseTransform):
     def __init__(self, total: int) -> None:
+        self.curr_key = 0
         self.total = total
 
-    def on_event(self, record: Record) -> Record:
-        self.getFF().parent.get(str(int(record.entry.key) - 1))
-        return record
-
+    def on_event(self, record: Record) -> None:
+        self.table_state.point_query(self.curr_key)
+        self.curr_key += 1
+    
     def on_stop(self, record:Record) -> Record:
-        avg = self.getFF().parent.table_state.times["point_query"]/self.getFF().parent.table_state.counts["point_query"]
-        logger.msg(f"AVERAGE READ LATENCY: {avg}")
+        print("average query latency:" , self.table_state.counts["point_query"]/self.table_state.times["point_query"])
         return record
 
 class DeleteFromDict(BaseTransform):
     def __init__(self, total: int) -> None:
+        self.curr_key = 0
         self.total = total
 
-    def on_event(self, record: Record) -> Record:
-        self.getFF().delete(record.entry.key)
-        return record
+    def on_event(self, record: Record) -> None:
+        self.table_state.delete(self.curr_key)
+        self.curr_key += 1
+        return None
 
     def on_stop(self, record:Record) -> Record:
-        avg = self.table_state.times["delete"]/self.table_state.counts["delete"]
-        logger.msg(f"AVERAGE DELETE LATENCY: {avg}")
+        print("average delete latency:" , self.table_state.counts["delete"]/self.table_state.times["delete"])
         return record
 
 if __name__ == "__main__":
@@ -104,18 +102,16 @@ if __name__ == "__main__":
         ),
     )
 
-    table_States = []
-    for _ in range(3):
-        dict_schema = Schema("key", {"key": str, "value": int, "timestamp": float})
-        dict_conn = DictConnector()
-        table_States.append(TableState(dict_schema, dict_conn))
-    
+    dict_schema = Schema("key", {"key": str, "value": int, "timestamp": float})
+    dict_conn = DictConnector()
+    table_state = TableState(dict_schema, dict_conn)
+
     addOne_ff = source_ff.transform(
         AddOne(),
         operator_config=OperatorConfig(
             ray_config=RayOperatorConfig(num_replicas=1),
         ),
-        table_state=table_States[0]
+        table_state=table_state
     )
 
     read_ff = addOne_ff.transform(
@@ -123,16 +119,16 @@ if __name__ == "__main__":
         operator_config=OperatorConfig(
             ray_config=RayOperatorConfig(num_replicas=1),
         ), 
-        table_state=table_States[1]
+        table_state=table_state
     )
 
-    # delete_ff = read_ff.transform(
-    #     DeleteFromDict(LOAD),
-    #     operator_config=OperatorConfig(
-    #         ray_config=RayOperatorConfig(num_replicas=1),
-    #     ), 
-    #     table_state=table_States[2]
-    # )
+    delete_ff = read_ff.transform(
+        DeleteFromDict(LOAD),
+        operator_config=OperatorConfig(
+            ray_config=RayOperatorConfig(num_replicas=1),
+        ), 
+        table_state=table_state
+    )
 
 
     app.deploy()
