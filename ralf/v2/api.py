@@ -101,12 +101,10 @@ class FeatureFrame:
 
     def __init__(
         self,
-        name: str, 
         transform_object: BaseTransform,
         scheduler: BaseScheduler = FIFO(),
         operator_config: OperatorConfig = OperatorConfig(),
     ):
-        self.name = name
         self.transform_object = transform_object
         self.scheduler = scheduler
         self.config = operator_config
@@ -127,6 +125,7 @@ class FeatureFrame:
         operator_config: OperatorConfig = OperatorConfig(),
     ) -> "FeatureFrame":
         """Apply a transformation to this feature frame, with scheduler."""
+        print("TRANSFORM", transform_object)
         frame = FeatureFrame(transform_object, scheduler, operator_config)
         self.children.append(frame)
         return frame
