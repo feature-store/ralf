@@ -3,13 +3,16 @@ import json
 import time
 import boto3
 import queue
+from dacite import from_dict
 from typing import Deque, Dict, Iterable, List, Optional, Type, Union
 
 class KinesisDataSource(BaseTransform): 
 
-    def __init__(self, stream_name: str, stream_arn: str, num_shards: int, prefix="ralf-kinesis"): 
+    def __init__(self, stream_name: str, stream_arn: str, num_shards: int, shard_key, data_class, prefix="ralf-kinesis"): 
 
         print("init source")
+        self.data_class = data_class
+        self.shard_key = shard_key
         self.prefix = prefix
         self.stream_name = stream_name
         self.stream_arn = stream_arn
@@ -107,10 +110,10 @@ class KinesisDataSource(BaseTransform):
                 })
 
         print(self.shards)
-        
 
-    def on_event(self, record: Record) -> Union[None, Record, Iterable[Record]]:
-        # return data from shards
+
+    def get_shard_events(self): 
+         # return data from shards
         i = self.index % len(self.shards)
         shard_id = self.shards[i]["shard_id"]
         seq_no = self.shards[i]["seq_no"]
@@ -132,9 +135,8 @@ class KinesisDataSource(BaseTransform):
             seq_no = record["SequenceNumber"]
             arrive_ts = record["ApproximateArrivalTimestamp"]
             data = record["Data"]
-            data = json.loads(data.decode('utf8').replace("'", '"'))
-            print(data)
-            #data["arrival_ts"] = arrive_ts
+            data = json.loads(json.loads(data.decode('utf8').replace("'", '"')))
+            data["ingest_time"] = arrive_ts
             records.append(data)
 
         # update query sequence no
@@ -142,4 +144,19 @@ class KinesisDataSource(BaseTransform):
         print(seq_no)
 
         return records
- 
+        
+
+    def on_event(self, record: Record) -> Union[None, Record, Iterable[Record]]:
+        events = self.get_shard_events()
+
+        records = []
+        for e in events: 
+            try:
+                records.append(Record(
+                    entry=self.data_class(**e),
+                    shard_key=str(e[self.shard_key])
+                ))
+            except Exception as error:
+                raise ValueError(error)
+        print(f"Sending {len(records)} records")
+        return records
