@@ -70,6 +70,15 @@ class BaseTransform:
     def prepare(self):
         pass
 
+    def on_stop(self, record: Record) -> Union[None, Record, Iterable[Record]]:
+        """        
+        Function called when a Stop Iteration event is received. Executes this on_stop method.
+        A StopIteration exception is raised after, and the transform process will terminate.
+        A StopIteration special record will still be propogated to downstream feature frames.
+        This function should be expected to be called once.
+        """
+        pass
+
     def __repr__(self):
         return self.__class__.__name__
 
