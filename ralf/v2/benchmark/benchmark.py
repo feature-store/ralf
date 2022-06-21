@@ -26,7 +26,7 @@ class SourceValue:
     timestamp: float
 
 #Number of records we're processing 
-TEST_SIZES = [1000, 100000, 10000000]
+TEST_SIZES = [1000, 100000]
 deploy_mode = "ray"
 sizes_str = "_".join([str(s) for s in TEST_SIZES])
 result_path = f"benchmark/results/size_{sizes_str}_{time.time()}.txt"
@@ -45,7 +45,7 @@ class FakeSource(BaseTransform):
     def __init__(self, total: int) -> None:
         self.count = 0
         self.total = total
-        self.num_keys = 1000
+        self.num_keys = max(TEST_SIZES) #not sharding for now
 
     def on_event(self, _: Record) -> List[Record[SourceValue]]:
 
