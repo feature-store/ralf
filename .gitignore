@@ -53,7 +53,7 @@ coverage.xml
 *.py,cover
 .hypothesis/
 .pytest_cache/
-
+ralf/v2/benchmark/results/*.txt
 # Translations
 *.mo
 *.pot

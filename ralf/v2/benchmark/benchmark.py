@@ -1,9 +1,12 @@
 import time
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, make_dataclass
 from typing import List
+import os
+from matplotlib.pyplot import table 
+import redis
 
-from nbformat import read
+
 from ralf.v2.connectors.dict_connector import DictConnector
 from ralf.v2.connectors.redis_connector import RedisConnector
 from ralf.v2.connectors.sqlite3_connector import SQLConnector
@@ -14,12 +17,9 @@ from ralf.v2 import BaseTransform, RalfApplication, RalfConfig, Record
 from ralf.v2.operator import OperatorConfig, RayOperatorConfig
 from ralf.v2.utils import get_logger
 
-logger = get_logger()
+IntValue = make_dataclass("IntValue", ["value"])
 
-@dataclass
-class SumValue:
-    key: str
-    value: int
+logger = get_logger()
 
 @dataclass
 class SourceValue:
@@ -28,7 +28,10 @@ class SourceValue:
     timestamp: float
 
 #Number of records we're processing 
-TEST_SIZE = 50
+TEST_SIZE = 5
+deploy_mode = "ray"
+test_config = f"DEPLOY MODE: {deploy_mode}\nTEST SIZE: {TEST_SIZE}\n\n"
+result_path = f"benchmark/results/size_{TEST_SIZE}_{time.time()}.txt"
 
 latencies = defaultdict(dict)
 throughputs = defaultdict(dict)
@@ -78,9 +81,9 @@ class UpdateReadDelete(BaseTransform):
     def on_event(self, record: Record) -> Record:
         record.entry.value += 1
 
-        self.update(record)
-        self.get(record.entry.key)
-        self.delete(record.entry.key)
+        self.getFF().table_state.update(record)
+        self.getFF().table_state.point_query(record.entry.key)
+        self.getFF().table_state.delete(record.entry.key)
 
         return record
     
@@ -101,53 +104,59 @@ class UpdateReadDelete(BaseTransform):
         logger.msg(f"AVERAGE READ LATENCY: {read_throughput} reads per second")
         logger.msg(f"AVERAGE DELETE LATENCY: {delete_throughput} deletes per second")
 
-        latencies[self.connector_type]["update"] = update_latency
-        latencies[self.connector_type]["read"] = read_latency
-        latencies[self.connector_type]["delete"] = delete_latency
+        latencies[self.connector_type]["update"] = update_latency * 1000
+        latencies[self.connector_type]["read"] = read_latency * 1000
+        latencies[self.connector_type]["delete"] = delete_latency * 1000
         
         throughputs[self.connector_type]["update"] = update_throughput
         throughputs[self.connector_type]["read"] = read_throughput
         throughputs[self.connector_type]["delete"] = delete_throughput
         
-        f = open(f"benchmark/results/{time.time()}.txt", "a")
-        results = "mode: ray\nconnector_mode: dict\nlatencies:\n"
-        for k,v in latencies.items():
+        results = "-"*50 + f"\nCONNECTOR_MODE: {self.connector_type}\nLATENCIES (ms per action):\n"
+        for k,v in latencies[self.connector_type].items():
             results += (f"{k}: {v}\n")
-        results += "throughputs:\n"
-        for k,v in throughputs.items():
+        results += "THROUGHPUTS(number of actions per second):\n"
+        for k,v in throughputs[self.connector_type].items():
             results += (f"{k}: {v}\n")
-        f.write(results)
-        f.close()
+        record_benchmark_results(results, result_path)
 
         return record
+def record_benchmark_results(results, path):
+    f = open(path, "a")
+    f.write(results)
+    f.close()
+
+def flush_testing_env():
+    if os.path.exists("key.db"):
+        os.remove("key.db")
+    r = redis.Redis()
+    r.flushdb()
 
 if __name__ == "__main__":
+    record_benchmark_results(test_config, result_path)
+    for connector_mode in existing_connectors:
+        flush_testing_env()
+        app = RalfApplication(RalfConfig(deploy_mode=deploy_mode))
 
-    deploy_mode = "ray"
-    connector_mode = "dict"
-    # deploy_mode = "local"
-    app = RalfApplication(RalfConfig(deploy_mode=deploy_mode))
+        source_ff = app.source(
+            FakeSource(TEST_SIZE),
+            operator_config=OperatorConfig(
+                ray_config=RayOperatorConfig(num_replicas=1),
+            ),
+        )
 
-    source_ff = app.source(
-        FakeSource(TEST_SIZE),
-        operator_config=OperatorConfig(
-            ray_config=RayOperatorConfig(num_replicas=1),
-        ),
-    )
+        schema = Schema("key", {"key": str, "value": int, "timestamp": float})
+        conn = existing_connectors[connector_mode]()
+        table_state = TableState(schema, conn, SourceValue)
+        
+        updateReadDelete_ff = source_ff.transform(
+            UpdateReadDelete(connector_mode),
+            operator_config=OperatorConfig(
+                ray_config=RayOperatorConfig(num_replicas=1),
+            ),
+            table_state = table_state
+        )
 
-    table_States = []
-    for _ in range(3):
-        dict_schema = Schema("key", {"key": str, "value": int, "timestamp": float})
-        dict_conn = existing_connectors[connector_mode]()
-        table_States.append(TableState(dict_schema, dict_conn, dataclass))
+        app.deploy()
+        app.wait()
     
-    updateReadDelete_ff = source_ff.transform(
-        UpdateReadDelete(connector_mode),
-        operator_config=OperatorConfig(
-            ray_config=RayOperatorConfig(num_replicas=1),
-        ),
-        table_state=table_States[0]
-    )
-
-    app.deploy()
-    app.wait()

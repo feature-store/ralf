@@ -1,6 +1,0 @@
-mode: ray
-connector_mode: dict
-latencies:
-dict: {'update': 1.1305809020996094e-05, 'read': 4.425048828125e-06, 'delete': 3.604888916015625e-06}
-throughputs:
-dict: {'update': 88450.1054407423, 'read': 225986.2068965517, 'delete': 277401.0582010582}
