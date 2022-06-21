@@ -28,7 +28,7 @@ class SourceValue:
 #Number of records we're processing 
 TEST_SIZES = [1000, 100000, 10000000]
 deploy_mode = "ray"
-sizes_str = "_".join(TEST_SIZES)
+sizes_str = "_".join([str(s) for s in TEST_SIZES])
 result_path = f"benchmark/results/size_{sizes_str}_{time.time()}.txt"
 
 latencies = defaultdict(dict)
