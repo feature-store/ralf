@@ -3,8 +3,6 @@ from collections import defaultdict
 from dataclasses import dataclass, make_dataclass
 from typing import List
 import os
-from unittest import result
-from matplotlib.pyplot import table 
 import redis
 
 from ralf.v2.connectors.dict_connector import DictConnector
