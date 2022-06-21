@@ -25,7 +25,7 @@ class SQLConfig:
 class SQLConnector(Connector):
     def __init__(self, dbname: str):
         self.dbname = dbname
-    
+
     def create_connection(self):
         # This function will return a new connection
         # if the connector is such that it cannot be shared
@@ -38,7 +38,7 @@ class SQLConnector(Connector):
         if hasattr(self, "conn"):
             conn = self.conn
         else:
-            conn = sqlite3.connect(self.dbname)
+            conn = sqlite3.connect(self.dbname, check_same_thread=False)
         table_name = schema.get_name()
         curr = conn.cursor()
         if schema.columns[schema.primary_key] not in sql_types:
@@ -68,7 +68,7 @@ class SQLConnector(Connector):
         curr.execute(f"DELETE FROM {table_name} WHERE {schema.primary_key} = {key}")
         self.conn.commit()
 
-    def get_one(self, schema: Schema, key: str, dataclass) -> Union[Record, None]:
+    def get(self, schema: Schema, key: str, dataclass) -> Union[Record, None]:
         # conn = sqlite3.connect(self.dbname)
         curr = self.conn.cursor()
         table_name = schema.get_name()
@@ -95,4 +95,4 @@ class SQLConnector(Connector):
         return count
 
     def prepare(self):
-        self.conn = sqlite3.connect(self.dbname)
+        self.conn = sqlite3.connect(self.dbname, check_same_thread=False) 

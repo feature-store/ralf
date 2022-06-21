@@ -8,6 +8,7 @@ from ralf.v2.table_state import TableState
 
 from ralf.v2 import BaseTransform, RalfApplication, RalfConfig, Record
 from ralf.v2.operator import OperatorConfig, RayOperatorConfig
+from ralf.v2.utils import get_logger
 
 
 @dataclass
@@ -22,6 +23,7 @@ class SumValue:
     key: str
     value: int
 
+logger = get_logger()
 
 class FakeSource(BaseTransform):
     def __init__(self, total: int) -> None:
@@ -66,21 +68,22 @@ class Sum(BaseTransform):
         )
 
 class UpdateDict(BaseTransform):
-    def __init__(self, table_state: TableState):
-        self.table_state = table_state
+    def __init__(self):
+        self.count = 0
 
     def on_event(self, record: Record) -> None:
-        print("single update table", self.table_state.connector.tables)
-        self.table_state.update(record)
+        self.update(record)
         return None
     
+    def on_stop(self, record: Record):
+        logger.msg(self.get_all())
+
 class BatchUpdate(BaseTransform):
-    def __init__(self, table_state:TableState, batch_size: int):
+    def __init__(self, batch_size: int):
         self.batch_size = batch_size
         self.count = 0
         self.records = []
-        self.table_state = table_state
-
+        
     def on_event(self, record: Record) -> None:
         self.records.append(record)
         self.count += 1
@@ -89,11 +92,13 @@ class BatchUpdate(BaseTransform):
             self.count = 0
             for r in self.records:
                 print(f"batch update, processing {r}")
-                self.table_state.update(r)
+                self.update(r)
             self.records = []
-            print("batch table", self.table_state.connector.tables)
         
         return None
+    
+    def on_stop(self, record: Record):
+        logger.msg(self.get_all())
 
 if __name__ == "__main__":
 
@@ -117,7 +122,8 @@ if __name__ == "__main__":
 
     dict_schema = Schema("key", {"key": str, "value": int})
     dict_schema_1 = Schema("key", {"key": str, "value": int})
-
+    dict_schema.name = "single"
+    dict_schema_1.name = "batch"
     dict_conn = DictConnector()
     dict_conn_1 = DictConnector()
 
@@ -125,19 +131,19 @@ if __name__ == "__main__":
     batch_table_state = TableState(dict_schema_1, dict_conn_1, dataclass)
 
     update_ff = sum_ff.transform(
-        UpdateDict(dict_table_state),
+        UpdateDict(),
         operator_config=OperatorConfig(
             ray_config=RayOperatorConfig(num_replicas=1),
         ),
+        table_state=dict_table_state
     )
 
-    batch_updater = BatchUpdate(batch_table_state, 3)
-
     batch_update_ff = sum_ff.transform(
-        batch_updater,
+        BatchUpdate(3),
         operator_config=OperatorConfig(
             ray_config=RayOperatorConfig(num_replicas=1),
         ),
+        table_state=batch_table_state
     )
 
     app.deploy()

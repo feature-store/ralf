@@ -78,7 +78,7 @@ class LocalOperator(RalfOperator):
         )
 
         logger.msg("Preparing transform object")
-
+        self.frame.prepare()
         self.worker_thread = Thread(target=self._run_forever, daemon=True)
         self.worker_thread.start()
 
@@ -92,7 +92,6 @@ class LocalOperator(RalfOperator):
         if hasattr(self.transform_object, "table_state"):
             self.transform_object.table_state.connector.prepare()
         self.transform_object.prepare()
-        
 
         db_path = f"{self.config.metrics_dir}/{str(self.frame.transform_object)}_{self.context['shard_idx']}.db"
         metrics_connection = event_metrics.MetricConnection(
@@ -152,6 +151,7 @@ class LocalOperator(RalfOperator):
 
                 # If this operator got StopIteration, it should exit
                 elif next_event.is_stop_iteration():
+                    self.transform_object.on_stop(next_event)
                     raise StopIteration()
 
                 else:
@@ -312,7 +312,9 @@ class _SimpySink(RalfOperator):
 
     def dump_transform_state(self):
         return self.recordings
-
+    
+    def get(self, key):
+        pass
 
 class SimpyOperator(RalfOperator):
     """Skip running transform, but record the event ordering"""
@@ -379,6 +381,8 @@ class SimpyOperator(RalfOperator):
         for record in records:
             self.scheduler.push_event(record)
 
+    def get(self, key):
+        return self.transform_object.get(key)
 
 @dataclass
 class RayOperatorConfig:

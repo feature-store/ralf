@@ -29,7 +29,7 @@ class RedisConnector(Connector):
     def delete(self, schema: Schema, key: str):
         self.conn.hdel(schema.get_name(), key)
 
-    def get_one(self, schema: Schema, key, dataclass) -> Union[Record, None]:
+    def get(self, schema: Schema, key, dataclass) -> Union[Record, None]:
         val = self.conn.hget(schema.get_name(), key)
         if val:
             return Record.deserialize(val, dataclass)

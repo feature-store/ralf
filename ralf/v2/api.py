@@ -67,20 +67,47 @@ class BaseTransform:
         """
         raise NotImplementedError("To be implemented by subclass.")
 
-    def prepare(self):
+    def on_stop(self, record: Record) -> Union[None, Record, Iterable[Record]]:
+        """        
+        Function called when a Stop Iteration event is received. Executes this on_stop method.
+
+        A StopIteration exception is raised after, and the transform process will terminate.
+        A StopIteration special record will still be propogated to downstream feature frames.
+
+        This function should be expected to be called once.
+        """
         pass
 
     def __repr__(self):
         return self.__class__.__name__
 
-    def get(self, key):
-        """Get current feature value for key. Returns null by default.
+    def getFF(self):
+        """Get the feature frame transform is being applied to. 
+        """
+        return self.feature_frame
+
+    def prepare(self):
+        pass
+
+    def get(self, key): 
+        """Get current feature value for key. 
 
         :param key: key to lookup feature value
         :type key: str
         """
-        return None
+        return self.getFF().get(key)
+    
+    def update(self, record:Record):
+        self.getFF().update(record)
 
+    def delete(self, key:str):
+        self.getFF().delete(key)
+
+    def get_all(self):
+        return self.getFF().get_all()
+    
+    def get_schema(self):
+        return self.getFF().get_schema()
 
 class FeatureFrame:
     """Encapsulate a feature transformation and its related policies configuration."""
@@ -95,8 +122,16 @@ class FeatureFrame:
         self.transform_object = transform_object
         self.scheduler = scheduler
         self.table_state = table_state
+        
+        # Adding component's access to this feature frame's resources
+        self.transform_object.feature_frame = self
+        self.scheduler.feature_frame = self
+        
         self.config = operator_config
-        self.children: List["FeatureFrame"] = []
+        
+        self.children: List["FeatureFrame"] = []        
+        self.parent: "FeatureFrame" = None
+
         logger.msg(
             "Created FeatureFrame",
             transform=transform_object,
@@ -117,11 +152,31 @@ class FeatureFrame:
         """Apply a transformation to this feature frame, with scheduler."""
         frame = FeatureFrame(transform_object, scheduler, table_state, operator_config)
         self.children.append(frame)
+        frame.parent = self
         return frame
 
     def __repr__(self) -> str:
         return f"FeatureFrame({repr(self.transform_object)})"
 
+    def get(self, key:str):
+        return self.table_state.point_query(key)
+
+    def update(self, record:Record):
+        self.table_state.update(record)
+
+    def delete(self, key:str):
+        self.table_state.delete(key)
+
+    def get_all(self):
+        return self.table_state.bulk_query()
+    
+    def get_schema(self):
+        return self.table_state.get_schema
+    
+    def prepare(self):
+        if self.table_state:
+            self.table_state.prepare()
+    #TODO: Interface to be able to query feature frame 
 
 class RalfApplication:
     """An end to end feature processing pipeline in Ralf."""

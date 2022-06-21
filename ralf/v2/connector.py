@@ -22,7 +22,7 @@ class Connector(ABC):
         pass
 
     @abstractmethod
-    def get_one(self, schema: Schema, key: str, dataclass) -> Union[Record, None]:
+    def get(self, schema: Schema, key: str, dataclass) -> Union[Record, None]:
         pass
 
     @abstractmethod

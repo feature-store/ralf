@@ -27,7 +27,7 @@ class DictConnector(Connector):
         if key in records:
             records.pop(key, None)
 
-    def get_one(self, schema: Schema, key, _) -> Union[Record, None]:
+    def get(self, schema: Schema, key, _) -> Union[Record, None]:
         records = self.get_records(schema)
         if key in records:
             return records[key]
