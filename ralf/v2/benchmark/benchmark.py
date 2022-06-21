@@ -3,9 +3,9 @@ from collections import defaultdict
 from dataclasses import dataclass, make_dataclass
 from typing import List
 import os
+from unittest import result
 from matplotlib.pyplot import table 
 import redis
-
 
 from ralf.v2.connectors.dict_connector import DictConnector
 from ralf.v2.connectors.redis_connector import RedisConnector
@@ -28,10 +28,10 @@ class SourceValue:
     timestamp: float
 
 #Number of records we're processing 
-TEST_SIZE = 5
+TEST_SIZES = [1000, 100000, 10000000]
 deploy_mode = "ray"
-test_config = f"DEPLOY MODE: {deploy_mode}\nTEST SIZE: {TEST_SIZE}\n\n"
-result_path = f"benchmark/results/size_{TEST_SIZE}_{time.time()}.txt"
+sizes_str = "_".join(TEST_SIZES)
+result_path = f"benchmark/results/size_{sizes_str}_{time.time()}.txt"
 
 latencies = defaultdict(dict)
 throughputs = defaultdict(dict)
@@ -115,12 +115,13 @@ class UpdateReadDelete(BaseTransform):
         results = "-"*50 + f"\nCONNECTOR_MODE: {self.connector_type}\nLATENCIES (ms per action):\n"
         for k,v in latencies[self.connector_type].items():
             results += (f"{k}: {v}\n")
-        results += "THROUGHPUTS(number of actions per second):\n"
+        results += "THROUGHPUTS (number of requests per second):\n"
         for k,v in throughputs[self.connector_type].items():
             results += (f"{k}: {v}\n")
         record_benchmark_results(results, result_path)
 
         return record
+
 def record_benchmark_results(results, path):
     f = open(path, "a")
     f.write(results)
@@ -133,30 +134,31 @@ def flush_testing_env():
     r.flushdb()
 
 if __name__ == "__main__":
-    record_benchmark_results(test_config, result_path)
-    for connector_mode in existing_connectors:
-        flush_testing_env()
-        app = RalfApplication(RalfConfig(deploy_mode=deploy_mode))
+    for test_size in TEST_SIZES:
+        record_benchmark_results(f"DEPLOY MODE: {deploy_mode}\nTEST SIZE: {test_size}\n\n", result_path)
+        for connector_mode in existing_connectors:
+            flush_testing_env()
+            app = RalfApplication(RalfConfig(deploy_mode=deploy_mode))
 
-        source_ff = app.source(
-            FakeSource(TEST_SIZE),
-            operator_config=OperatorConfig(
-                ray_config=RayOperatorConfig(num_replicas=1),
-            ),
-        )
+            source_ff = app.source(
+                FakeSource(test_size),
+                operator_config=OperatorConfig(
+                    ray_config=RayOperatorConfig(num_replicas=1),
+                ),
+            )
 
-        schema = Schema("key", {"key": str, "value": int, "timestamp": float})
-        conn = existing_connectors[connector_mode]()
-        table_state = TableState(schema, conn, SourceValue)
-        
-        updateReadDelete_ff = source_ff.transform(
-            UpdateReadDelete(connector_mode),
-            operator_config=OperatorConfig(
-                ray_config=RayOperatorConfig(num_replicas=1),
-            ),
-            table_state = table_state
-        )
+            schema = Schema("key", {"key": str, "value": int, "timestamp": float})
+            conn = existing_connectors[connector_mode]()
+            table_state = TableState(schema, conn, SourceValue)
+            
+            updateReadDelete_ff = source_ff.transform(
+                UpdateReadDelete(connector_mode),
+                operator_config=OperatorConfig(
+                    ray_config=RayOperatorConfig(num_replicas=1),
+                ),
+                table_state = table_state
+            )
 
-        app.deploy()
-        app.wait()
-    
+            app.deploy()
+            app.wait()
+        record_benchmark_results("\n\n", result_path)
