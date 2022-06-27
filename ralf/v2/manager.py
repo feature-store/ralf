@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Dict, List, Type
 
 import ray
 
-from ralf.v2.operator.operator import (
+from ralf.v2.operator import (
     LocalOperator,
     RalfOperator,
     RayOperator,

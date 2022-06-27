@@ -12,7 +12,7 @@ from typing_extensions import Literal
 from ralf.v2.table_state import TableState
 
 from ralf.v2.manager import LocalManager, RalfManager, RayManager, SimpyManager
-from ralf.v2.operator.operator import OperatorConfig
+from ralf.v2.operator import OperatorConfig
 from ralf.v2.record import Record
 from ralf.v2.scheduler import FIFO, BaseScheduler, SourceScheduler
 from ralf.v2.utils import MERGE_DB_SCRIPTS, get_logger
