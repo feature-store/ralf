@@ -73,7 +73,7 @@ class RayManager(RalfManager):
                 refs.append(handle.wait_for_exit.remote())
         while True:
             _, not_done = ray.wait(refs, num_returns=len(refs), timeout=0.5)
-            # print("Waiting for", not_done)
+            #print("Waiting for", not_done)
             if len(not_done) == 0:
                 break
             time.sleep(1)

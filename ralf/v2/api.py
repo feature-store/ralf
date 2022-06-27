@@ -79,7 +79,22 @@ class BaseTransform:
         :param key: key to lookup feature value
         :type key: str
         """
+        # TODO: change to NotImplementedError
         return None
+
+
+class SourceTransform(BaseTransform): 
+    """Transformations that define sources"""
+
+    @abstractmethod
+    def next(self): 
+        raise NotImplementedError
+
+    def on_event(self, record: Record) -> Union[None, Record, Iterable[Record]]:
+        """
+        Process "dummy" records by calling user-defined .next()
+        """
+        return self.next()
 
 
 class FeatureFrame:

@@ -6,8 +6,8 @@ from ralf.v2.connectors.dict_connector import DictConnector
 from ralf.v2.record import Schema
 from ralf.v2.table_state import TableState
 
-from ralf.v2 import BaseTransform, RalfApplication, RalfConfig, Record
-from ralf.v2.operator import OperatorConfig, RayOperatorConfig
+from ralf.v2 import BaseTransform, RalfApplication, RalfConfig, Record, Source
+from ralf.v2.operator.operator import OperatorConfig, RayOperatorConfig
 
 
 @dataclass
@@ -22,14 +22,13 @@ class SumValue:
     key: str
     value: int
 
-
-class FakeSource(BaseTransform):
+class FakeSource(Source):
     def __init__(self, total: int) -> None:
         self.count = 0
         self.total = total
         self.num_keys = 10
 
-    def on_event(self, _: Record) -> List[Record[SourceValue]]:
+    def next():
 
         if self.count >= self.total:
             print("completed iteration")
