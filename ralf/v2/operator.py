@@ -103,7 +103,7 @@ class LocalOperator(RalfOperator):
         #     },
         # )
         logger.msg(f"Store metrics at {db_path}")
-        set_metrics_conn(metrics_connection)
+        # set_metrics_conn(metrics_connection)
 
         error_count = 0
         max_error_count = 10
