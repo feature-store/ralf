@@ -63,7 +63,7 @@ class RayManager(RalfManager):
 
     def __init__(self, config):
         if not ray.is_initialized():
-            ray.init()
+            ray.init("ray://127.0.0.1:10001")
         super().__init__(config)
 
     def wait(self):
