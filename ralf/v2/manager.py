@@ -61,8 +61,8 @@ class RayManager(RalfManager):
 
     operator_cls: Type[RalfOperator] = RayOperator
 
-    def __init__(self, config):
-        if not ray.is_initialized():
+    def __init__(self, config: "RalfConfig"):
+        if not ray.is_initialized() or config.is_head_node:
             ray.init("ray://127.0.0.1:10001")
         super().__init__(config)
 
