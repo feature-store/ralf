@@ -98,7 +98,7 @@ if __name__ == "__main__":
 
     deploy_mode = "ray"
     # deploy_mode = "local"
-    app = RalfApplication(RalfConfig(deploy_mode=deploy_mode))
+    app = RalfApplication(RalfConfig(deploy_mode=deploy_mode, is_head_node=True))
 
     source_ff = app.source(
         FakeSource(10),

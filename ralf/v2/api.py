@@ -34,6 +34,8 @@ class RalfConfig:
 
     metrics_dir: Optional[str] = None
 
+    is_head_node: bool = False
+
     def __post_init__(self):
         assert self.deploy_mode.lower() in SUPPORTED_DEPLOY_MODES
         if self.metrics_dir is None:

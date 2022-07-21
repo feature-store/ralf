@@ -95,15 +95,15 @@ class LocalOperator(RalfOperator):
         
 
         db_path = f"{self.config.metrics_dir}/{str(self.frame.transform_object)}_{self.context['shard_idx']}.db"
-        metrics_connection = event_metrics.MetricConnection(
-            db_path,
-            default_labels={
-                **self.context,
-                **dict(transform=str(self.frame.transform_object)),
-            },
-        )
+        # metrics_connection = event_metrics.MetricConnection(
+        #     db_path,
+        #     default_labels={
+        #         **self.context,
+        #         **dict(transform=str(self.frame.transform_object)),
+        #     },
+        # )
         logger.msg(f"Store metrics at {db_path}")
-        set_metrics_conn(metrics_connection)
+        # set_metrics_conn(metrics_connection)
 
         error_count = 0
         max_error_count = 10
@@ -132,7 +132,7 @@ class LocalOperator(RalfOperator):
                             or not next_event.is_wait_event()
                         )
 
-            metrics_connection.observe("queue_size", self.scheduler.qsize())
+            # metrics_connection.observe("queue_size", self.scheduler.qsize())
             try:
                 # Process the record
                 if isinstance(next_event, list) or next_event.is_data():
