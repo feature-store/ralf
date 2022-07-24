@@ -162,6 +162,7 @@ class LocalOperator(RalfOperator):
                 logger.msg(
                     "operator received StopIteration, propogating and exiting..."
                 )
+                self.transform_object.on_shutdown()
                 self._send_to_children([Record.make_stop_iteration()])
                 break
             # Application error, log and continue
