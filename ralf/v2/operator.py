@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from collections import defaultdict
 from collections.abc import Sequence
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from threading import Thread
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type
 
@@ -95,15 +95,15 @@ class LocalOperator(RalfOperator):
         self.transform_object.prepare()
 
         db_path = f"{self.config.metrics_dir}/{str(self.frame.transform_object)}_{self.context['shard_idx']}.db"
-        metrics_connection = event_metrics.MetricConnection(
-            db_path,
-            default_labels={
-                **self.context,
-                **dict(transform=str(self.frame.transform_object)),
-            },
-        )
-        logger.msg(f"Store metrics at {db_path}")
-        set_metrics_conn(metrics_connection)
+        # metrics_connection = event_metrics.MetricConnection(
+        #     db_path,
+        #     default_labels={
+        #         **self.context,
+        #         **dict(transform=str(self.frame.transform_object)),
+        #     },
+        # )
+        # logger.msg(f"Store metrics at {db_path}")
+        # set_metrics_conn(metrics_connection)
 
         error_count = 0
         max_error_count = 10
@@ -249,6 +249,7 @@ class RayOperator(RalfOperator):
         self.frame = frame
         self.pool = OperatorActorPool.make_replicas(
             num_replicas=frame.config.ray_config.num_replicas,
+            actor_options=frame.config.ray_config.actor_options,
             actor_class=RayLocalOperator,
             init_kwargs={
                 "frame": frame,
@@ -386,6 +387,7 @@ class SimpyOperator(RalfOperator):
 @dataclass
 class RayOperatorConfig:
     num_replicas: int = 1
+    actor_options: dict = field(default_factory=dict)
 
 
 @dataclass
