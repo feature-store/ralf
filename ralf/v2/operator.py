@@ -71,6 +71,7 @@ class LocalOperator(RalfOperator):
         self.context = context
         self.config = ralf_config
 
+        self.transform_object.operator_context = self.context
         structlog.threadlocal.bind_threadlocal(
             frame=self.frame,
             context=self.context,
@@ -92,7 +93,6 @@ class LocalOperator(RalfOperator):
         if hasattr(self.transform_object, "table_state"):
             self.transform_object.table_state.connector.prepare()
         self.transform_object.prepare()
-        
 
         db_path = f"{self.config.metrics_dir}/{str(self.frame.transform_object)}_{self.context['shard_idx']}.db"
         metrics_connection = event_metrics.MetricConnection(
@@ -132,7 +132,7 @@ class LocalOperator(RalfOperator):
                             or not next_event.is_wait_event()
                         )
 
-            metrics_connection.observe("queue_size", self.scheduler.qsize())
+            # metrics_connection.observe("queue_size", self.scheduler.qsize())
             try:
                 # Process the record
                 if isinstance(next_event, list) or next_event.is_data():
@@ -225,13 +225,16 @@ class OperatorActorPool:
 
         return cls(handles)
 
-    def hash_key(self, key: str) -> int:
-        assert isinstance(key, str)
-        hash_val = hashlib.sha1(key.encode("utf-8")).hexdigest()
-        return int(hash_val, 16)
+    # def hash_key(self, key: str) -> int:
+    #     assert isinstance(key, str)
+    #     hash_val = hashlib.sha1(key.encode("utf-8")).hexdigest()
+    #     return int(hash_val, 16)
 
-    def choose_actor(self, key: str) -> ActorHandle:
-        return self.handles[self.hash_key(key) % len(self.handles)]
+    # def choose_actor(self, key: str) -> ActorHandle:
+    #     return self.handles[self.hash_key(key) % len(self.handles)]
+
+    def choose_actor(self, key: int) -> ActorHandle:
+        return self.handles[key % len(self.handles)]
 
 
 class RayOperator(RalfOperator):
@@ -255,22 +258,22 @@ class RayOperator(RalfOperator):
         )
         self.children = children
 
-    def _check_sharding_key_exist_if_necessary(self, records: List[Record]):
-        if len(records) == 0:
-            return
-        r = records[0]
-        if r.is_data() and len(self.pool.handles) > 1:
-            assert (
-                r.shard_key != ""
-            ), f"{self.frame} is sharded but no shard key preset."
+    # def _check_sharding_key_exist_if_necessary(self, records: List[Record]):
+    #     if len(records) == 0:
+    #         return
+    #     r = records[0]
+    #     if r.is_data() and len(self.pool.handles) > 1:
+    #         assert (
+    #             r.shard_key != ""
+    #         ), f"{self.frame} is sharded but no shard key preset."
 
     def enqueue_events(self, records: List[Record]):
-        self._check_sharding_key_exist_if_necessary(records)
+        # self._check_sharding_key_exist_if_necessary(records)
 
         actor_map = defaultdict(list)
         for record in records:
             if record.is_data():
-                actor_map[self.pool.choose_actor(record.shard_key)].append(record)
+                actor_map[self.pool.choose_actor(record.entry.shard_key)].append(record)
             elif record.is_stop_iteration():  # broadcast termination event
                 [
                     actor.local_handle_events.remote([record])
