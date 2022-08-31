@@ -196,7 +196,7 @@ class RayLocalOperator(LocalOperator):
             if not self.worker_thread.is_alive():
                 logger.msg("Worker thread exited!", frame=self.frame)
                 break
-
+        logger.msg("exiting...")
 
 class OperatorActorPool:
     """Contains a set number of Ray Actors."""

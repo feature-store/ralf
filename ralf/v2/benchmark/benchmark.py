@@ -1,3 +1,5 @@
+from multiprocessing.sharedctypes import Value
+from sqlite3 import Timestamp
 import time
 from collections import defaultdict
 from dataclasses import dataclass, make_dataclass
@@ -15,8 +17,6 @@ from ralf.v2 import BaseTransform, RalfApplication, RalfConfig, Record
 from ralf.v2.operator import OperatorConfig, RayOperatorConfig
 from ralf.v2.utils import get_logger
 
-IntValue = make_dataclass("IntValue", ["value"])
-
 logger = get_logger()
 
 @dataclass
@@ -25,8 +25,16 @@ class SourceValue:
     value: int
     timestamp: float
 
+@dataclass
+class LargeSourceValue:
+    key: str
+    value: str
+    timestamp: float
+
+LONG_TEXT_SIZE = 10 ** 6
+
 #Number of records we're processing 
-TEST_SIZES = [1000, 100000]
+TEST_SIZES = [5,1000,1000000]
 deploy_mode = "ray"
 sizes_str = "_".join([str(s) for s in TEST_SIZES])
 result_path = f"benchmark/results/size_{sizes_str}_{time.time()}.txt"
@@ -56,15 +64,38 @@ class FakeSource(BaseTransform):
         self.count += 1
         key = str(self.count % self.num_keys)
 
-        # sleep to slow down send rate
-        time.sleep(1)
-
         # return list of records (wrapped around dataclass)
         return [
             Record(
                 entry=SourceValue(
                     key=key,
                     value=self.count,
+                    timestamp=time.time(),
+                ),
+                shard_key=key,  # key to shard/query
+            )
+        ]
+class LargeFakeSource(BaseTransform):
+    def __init__(self, total: int) -> None:
+        self.count = 0
+        self.total = total
+        self.num_keys = max(TEST_SIZES) #not sharding for now
+
+    def on_event(self, _: Record) -> List[Record[SourceValue]]:
+
+        if self.count >= self.total:
+            print("completed iteration")
+            raise StopIteration()
+
+        self.count += 1
+        key = str(self.count % self.num_keys)
+
+        # return list of records (wrapped around dataclass)
+        return [
+            Record(
+                entry=LargeSourceValue(
+                    key=key,
+                    value=key*LONG_TEXT_SIZE,
                     timestamp=time.time(),
                 ),
                 shard_key=key,  # key to shard/query
@@ -77,38 +108,17 @@ class UpdateReadDelete(BaseTransform):
         self.connector_type = connector_type
 
     def on_event(self, record: Record) -> Record:
-        record.entry.value += 1
-
         self.getFF().table_state.update(record)
         self.getFF().table_state.point_query(record.entry.key)
         self.getFF().table_state.delete(record.entry.key)
 
+        if int(record.entry.key) % 50000 == 0:
+            logger.msg(f"Processed record: {record.entry.key}")
+            log_and_get_metrics(self)
         return record
     
     def on_stop(self, record:Record) -> Record:
-        update_latency = self.getFF().table_state.times["update"]/self.getFF().table_state.counts["update"]
-        read_latency = self.getFF().table_state.times["point_query"]/self.getFF().table_state.counts["point_query"]
-        delete_latency = self.getFF().table_state.times["delete"]/self.getFF().table_state.counts["delete"]
-        
-        update_throughput = self.getFF().table_state.counts["update"]/self.getFF().table_state.times["update"]
-        read_throughput = self.getFF().table_state.counts["point_query"]/self.getFF().table_state.times["point_query"]
-        delete_throughput = self.getFF().table_state.counts["delete"]/self.getFF().table_state.times["delete"]
-
-        logger.msg(f"AVERAGE UPDATE LATENCY: {update_latency * 1000} ms per update")
-        logger.msg(f"AVERAGE READ LATENCY: {read_latency * 1000} ms per read")
-        logger.msg(f"AVERAGE DELETE LATENCY: {delete_latency * 1000} ms per delete")
-
-        logger.msg(f"AVERAGE UPDATE LATENCY: {update_throughput} updates per second")
-        logger.msg(f"AVERAGE READ LATENCY: {read_throughput} reads per second")
-        logger.msg(f"AVERAGE DELETE LATENCY: {delete_throughput} deletes per second")
-
-        latencies[self.connector_type]["update"] = update_latency * 1000
-        latencies[self.connector_type]["read"] = read_latency * 1000
-        latencies[self.connector_type]["delete"] = delete_latency * 1000
-        
-        throughputs[self.connector_type]["update"] = update_throughput
-        throughputs[self.connector_type]["read"] = read_throughput
-        throughputs[self.connector_type]["delete"] = delete_throughput
+        latencies, throughputs = log_and_get_metrics(self)
         
         results = "-"*50 + f"\nCONNECTOR_MODE: {self.connector_type}\nLATENCIES (ms per action):\n"
         for k,v in latencies[self.connector_type].items():
@@ -119,6 +129,33 @@ class UpdateReadDelete(BaseTransform):
         record_benchmark_results(results, result_path)
 
         return record
+
+def log_and_get_metrics(transform):
+    update_latency = transform.getFF().table_state.times["update"]/transform.getFF().table_state.counts["update"]
+    read_latency = transform.getFF().table_state.times["point_query"]/transform.getFF().table_state.counts["point_query"]
+    delete_latency = transform.getFF().table_state.times["delete"]/transform.getFF().table_state.counts["delete"]
+    
+    update_throughput = transform.getFF().table_state.counts["update"]/transform.getFF().table_state.times["update"]
+    read_throughput = transform.getFF().table_state.counts["point_query"]/transform.getFF().table_state.times["point_query"]
+    delete_throughput = transform.getFF().table_state.counts["delete"]/transform.getFF().table_state.times["delete"]
+
+    logger.msg(f"AVERAGE UPDATE LATENCY: {update_latency * 1000} ms per update")
+    logger.msg(f"AVERAGE READ LATENCY: {read_latency * 1000} ms per read")
+    logger.msg(f"AVERAGE DELETE LATENCY: {delete_latency * 1000} ms per delete")
+
+    logger.msg(f"AVERAGE UPDATE THROUGHPUTS: {update_throughput} updates per second")
+    logger.msg(f"AVERAGE READ THROUGHPUTS: {read_throughput} reads per second")
+    logger.msg(f"AVERAGE DELETE THROUGHPUTS: {delete_throughput} deletes per second")
+
+    latencies[transform.connector_type]["update"] = update_latency * 1000
+    latencies[transform.connector_type]["read"] = read_latency * 1000
+    latencies[transform.connector_type]["delete"] = delete_latency * 1000
+    
+    throughputs[transform.connector_type]["update"] = update_throughput
+    throughputs[transform.connector_type]["read"] = read_throughput
+    throughputs[transform.connector_type]["delete"] = delete_throughput
+
+    return latencies, throughputs
 
 def record_benchmark_results(results, path):
     f = open(path, "a")
@@ -133,21 +170,21 @@ def flush_testing_env():
 
 if __name__ == "__main__":
     for test_size in TEST_SIZES:
-        record_benchmark_results(f"DEPLOY MODE: {deploy_mode}\nTEST SIZE: {test_size}\n\n", result_path)
+        record_benchmark_results(f"TIME: {time.localtime()}\nRECORD SIZE: {LONG_TEXT_SIZE}\nDEPLOY MODE: {deploy_mode}\nTEST SIZE: {test_size}\n\n", result_path)
         for connector_mode in existing_connectors:
             flush_testing_env()
             app = RalfApplication(RalfConfig(deploy_mode=deploy_mode))
 
             source_ff = app.source(
-                FakeSource(test_size),
+                LargeFakeSource(test_size),
                 operator_config=OperatorConfig(
                     ray_config=RayOperatorConfig(num_replicas=1),
                 ),
             )
 
-            schema = Schema("key", {"key": str, "value": int, "timestamp": float})
+            schema = Schema("key", {"key": str, "value": str, "timestamp": float})
             conn = existing_connectors[connector_mode]()
-            table_state = TableState(schema, conn, SourceValue)
+            table_state = TableState(schema, conn, LargeSourceValue)
             
             updateReadDelete_ff = source_ff.transform(
                 UpdateReadDelete(connector_mode),
